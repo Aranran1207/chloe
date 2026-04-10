@@ -5,5 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   drag: (x, y) => ipcRenderer.send('drag', { x, y }),
   endDrag: () => ipcRenderer.send('end-drag'),
   quitApp: () => ipcRenderer.send('quit-app'),
-  minimizeApp: () => ipcRenderer.send('minimize-app') // 新增：最小化窗口
+  minimizeApp: () => ipcRenderer.send('minimize-app'),
+  getWindowPosition: () => ipcRenderer.invoke('get-window-position'),
+  setWindowPosition: (x, y) => ipcRenderer.send('set-window-position', { x, y })
 });

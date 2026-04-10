@@ -23,12 +23,14 @@ const showMenu = ref(false);
 const menuX = ref(0);
 const menuY = ref(0);
 let chloe: typeof ChloeLive2D | null = null;
+let isMouseDown = false;
 let isDragging = false;
-let startX = 0; // 鼠标按下时的客户端X
-let startY = 0; // 鼠标按下时的客户端Y
-let winStartX = 0; // 窗口初始X坐标
-let winStartY = 0; // 窗口初始Y坐标
-const DRAG_THRESHOLD = 5; // 拖拽阈值
+let hasWindowPosition = false;
+let startX = 0;
+let startY = 0;
+let winStartX = 0;
+let winStartY = 0;
+const DRAG_THRESHOLD = 5;
 
 // 修复：Canvas 尺寸绑定到容器（不是document），避免窗口变大
 const resizeCanvas = () => {
@@ -53,47 +55,43 @@ const resizeCanvas = () => {
 
 const handleMouseDown = (e: MouseEvent) => {
   showMenu.value = false;
-  // 记录鼠标初始位置（相对客户端）
-  startX = e.clientX;
-  startY = e.clientY;
+  isMouseDown = true;
   isDragging = false;
+  hasWindowPosition = false;
 
-  // 修复：先获取窗口初始位置（从Electron API拿）
   if (window.electronAPI) {
-    // 新增：获取窗口当前位置，存到winStartX/winStartY
     window.electronAPI.getWindowPosition().then(([x, y]) => {
       winStartX = x;
       winStartY = y;
+      startX = e.screenX;
+      startY = e.screenY;
+      hasWindowPosition = true;
     });
-    // 注释掉：不再直接传screenX，改在mousemove计算偏移
   }
 };
 
 const handleMouseMove = (e: MouseEvent) => {
-  // 计算鼠标位移，判断是否触发拖拽
-  const dx = Math.abs(e.clientX - startX);
-  const dy = Math.abs(e.clientY - startY);
+  if (!isMouseDown || !hasWindowPosition) return;
 
-  // 未触发拖拽且超过阈值
+  const dx = Math.abs(e.screenX - startX);
+  const dy = Math.abs(e.screenY - startY);
+
   if (!isDragging && (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD)) {
     isDragging = true;
   }
 
-  // 仅当拖拽状态时，计算窗口新位置
   if (isDragging && window.electronAPI) {
-    // 修复：计算窗口偏移（鼠标移动的距离 = 当前鼠标 - 初始鼠标）
-    const offsetX = e.clientX - startX;
-    const offsetY = e.clientY - startY;
-    // 窗口新位置 = 初始窗口位置 + 鼠标偏移
+    const offsetX = e.screenX - startX;
+    const offsetY = e.screenY - startY;
     const newWinX = winStartX + offsetX;
     const newWinY = winStartY + offsetY;
-    // 传递新位置给Electron，而不是鼠标的screen坐标
     window.electronAPI.setWindowPosition(newWinX, newWinY);
   }
 };
 
 const handleMouseUp = () => {
-  isDragging = false; // 仅重置状态，不需要endDrag（因为改了拖拽逻辑）
+  isMouseDown = false;
+  isDragging = false;
 };
 
 const showContextMenu = (e: MouseEvent) => {
@@ -111,11 +109,7 @@ const quitApp = () => {
 
 onMounted(() => {
   if (canvasRef.value && containerRef.value) {
-    // 初始化Canvas尺寸
     resizeCanvas();
-    // 修复：监听容器resize，不是window（避免窗口移动触发resize）
-    const resizeObserver = new ResizeObserver(resizeCanvas);
-    resizeObserver.observe(containerRef.value);
 
     console.log('[Chloe] Initializing Live2D...');
     chloe = ChloeLive2D.getInstance();
@@ -141,17 +135,10 @@ onMounted(() => {
       const dpr = window.devicePixelRatio || 1;
       chloe?.onTap(x * dpr, y * dpr);
     });
-
-    // 存到全局，供onUnmounted销毁
-    (window as any).resizeObserver = resizeObserver;
   }
 });
 
 onUnmounted(() => {
-  // 销毁ResizeObserver，防止内存泄漏
-  if ((window as any).resizeObserver) {
-    (window as any).resizeObserver.disconnect();
-  }
   if (chloe) {
     chloe.stop();
     chloe.release();
@@ -161,9 +148,9 @@ onUnmounted(() => {
 
 <style scoped>
 .live2d-container {
-  width: 100%; /* 修复：用100%而不是100vw，避免超出窗口 */
-  height: 100%; /* 修复：用100%而不是100vh，避免超出窗口 */
-  position: relative; /* 修复：改为relative，避免fixed导致全屏 */
+  width: 500px;
+  height: 800px;
+  position: relative;
   cursor: default;
   overflow: hidden;
   z-index: 999;
@@ -171,8 +158,8 @@ onUnmounted(() => {
 
 .live2d-canvas {
   display: block;
-  width: 100%; /* 显式设置，避免尺寸异常 */
-  height: 100%;
+  width: 500px;
+  height: 800px;
 }
 
 .context-menu {

@@ -68,6 +68,14 @@ ipcMain.on('quit-app', () => {
   app.quit();
 });
 
+ipcMain.handle('get-window-position', () => {
+  return mainWindow.getPosition();
+});
+
+ipcMain.on('set-window-position', (event, { x, y }) => {
+  mainWindow.setPosition(Math.round(x), Math.round(y));
+});
+
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
