@@ -6,6 +6,8 @@
        @mouseleave="handleMouseUp" 
        @contextmenu.prevent="showContextMenu">
     <canvas ref="canvasRef" class="live2d-canvas"></canvas>
+    
+    <LoadingSpinner :visible="isLoading" :text="loadingText" />
 
     <Transition name="menu-fade">
       <div v-if="showMenu" class="context-menu" :style="{ left: menuX + 'px', top: menuY + 'px' }">
@@ -74,6 +76,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { ChloeLive2D } from '../lib/chloe';
 import SettingsPanel from './SettingsPanel.vue';
+import LoadingSpinner from './LoadingSpinner.vue';
 
 interface ModelInfo {
   name: string;
@@ -94,6 +97,8 @@ const modelMenuY = ref(0);
 const modelBasePath = ref('./resources/');
 const modelList = ref<ModelInfo[]>([]);
 const currentModel = ref<ModelInfo | null>(null);
+const isLoading = ref(true);
+const loadingText = ref('正在加载模型...');
 let chloe: typeof ChloeLive2D | null = null;
 let isMouseDown = false;
 let isDragging = false;
@@ -246,6 +251,8 @@ const switchModel = async (model: ModelInfo) => {
   if (!chloe) return;
   
   currentModel.value = model;
+  loadingText.value = `正在加载 ${model.name}...`;
+  isLoading.value = true;
   
   if (window.electronAPI) {
     await window.electronAPI.setConfig({ 
@@ -270,6 +277,10 @@ const switchModel = async (model: ModelInfo) => {
     chloe.loadModel(modelPath, model.file);
     chloe.start();
   }
+  
+  setTimeout(() => {
+    isLoading.value = false;
+  }, 500);
 };
 
 const handleSaveSettings = async (path: string) => {
@@ -357,6 +368,11 @@ onMounted(async () => {
     resizeCanvas();
     
     await loadConfig();
+    
+    if (currentModel.value) {
+      loadingText.value = `正在加载 ${currentModel.value.name}...`;
+    }
+    isLoading.value = true;
 
     chloe = ChloeLive2D.getInstance();
     const initSuccess = chloe.initialize(canvasRef.value);
@@ -386,6 +402,10 @@ onMounted(async () => {
       const dpr = window.devicePixelRatio || 1;
       chloe?.onTap(x * dpr, y * dpr);
     });
+    
+    setTimeout(() => {
+      isLoading.value = false;
+    }, 800);
   }
 });
 

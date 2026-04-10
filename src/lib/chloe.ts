@@ -193,8 +193,7 @@ export class ChloeLive2D {
     const projection = new CubismMatrix44();
 
     if (this._model.getModel()) {
-      if (this._model.getModel().getCanvasWidth() > 1.0 && width < height) {
-        this._model.getModelMatrix().setWidth(2.0);
+      if (width < height) {
         projection.scale(1.0, width / height);
       } else {
         projection.scale(height / width, 1.0);
