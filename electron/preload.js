@@ -7,5 +7,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitApp: () => ipcRenderer.send('quit-app'),
   minimizeApp: () => ipcRenderer.send('minimize-app'),
   getWindowPosition: () => ipcRenderer.invoke('get-window-position'),
-  setWindowPosition: (x, y) => ipcRenderer.send('set-window-position', { x, y })
+  setWindowPosition: (x, y) => ipcRenderer.send('set-window-position', { x, y }),
+  startGlobalMouseTracking: () => ipcRenderer.send('start-global-mouse-tracking'),
+  stopGlobalMouseTracking: () => ipcRenderer.send('stop-global-mouse-tracking'),
+  onGlobalMouseMove: (callback) => ipcRenderer.on('global-mouse-move', (event, data) => callback(data)),
+  getConfig: () => ipcRenderer.invoke('get-config'),
+  setConfig: (config) => ipcRenderer.invoke('set-config', config),
+  openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),
+  getModelList: () => ipcRenderer.invoke('get-model-list')
 });

@@ -22,7 +22,7 @@ export class ChloeTextureManager {
     for (let ite: iterator<TextureInfo> = this._textures.begin(); ite.notEqual(this._textures.end()); ite.preIncrement()) {
       this._glManager.getGl().deleteTexture(ite.ptr().id);
     }
-    this._textures = null;
+    this._textures = new csmVector<TextureInfo>();
   }
 
   public createTextureFromPngFile(

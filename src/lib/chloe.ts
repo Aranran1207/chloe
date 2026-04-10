@@ -264,7 +264,11 @@ export class ChloeLive2D {
     if (this._textureManager) {
       this._textureManager.release();
     }
+  }
 
+  public releaseAll(): void {
+    this.release();
+    
     CubismFramework.dispose();
 
     this._initialized = false;
