@@ -1,0 +1,71 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "藿藿.moc3",
+		"Textures": [
+			"藿藿.8192/texture_00.png",
+			"藿藿.8192/texture_01.png",
+			"藿藿.8192/texture_02.png",
+			"藿藿.8192/texture_03.png"
+		],
+		"Physics": "藿藿.physics3.json",
+		"DisplayInfo": "藿藿.cdi3.json",
+		"Expressions": [
+			{
+				"Name": "抱枕",
+				"File": "抱枕.exp3.json"
+			},
+			{
+				"Name": "拿旗子",
+				"File": "拿旗子.exp3.json"
+			},
+			{
+				"Name": "白眼",
+				"File": "白眼.exp3.json"
+			},
+			{
+				"Name": "眼泪",
+				"File": "眼泪.exp3.json"
+			},
+			{
+				"Name": "黑脸",
+				"File": "黑脸.exp3.json"
+			}
+		],
+		"Motions": {
+			"": [
+				{
+					"File": "motions/haoqi.motion3.json"
+				},
+				{
+					"File": "motions/keshui.motion3.json"
+				},
+				{
+					"File": "motions/linghun.motion3.json"
+				},
+				{
+					"File": "motions/qizi.motion3.json"
+				},
+				{
+					"File": "motions/yaotou.motion3.json"
+				},
+				{
+					"File": "motions/zhentou.motion3.json"
+				}
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		}
+	],
+	"HitAreas": []
+}

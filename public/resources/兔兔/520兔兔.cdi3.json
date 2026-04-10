@@ -1,0 +1,480 @@
+{
+	"Version": 3,
+	"Parameters": [
+		{
+			"Id": "ParamAngleX",
+			"GroupId": "",
+			"Name": "角度 X"
+		},
+		{
+			"Id": "ParamAngleY",
+			"GroupId": "",
+			"Name": "角度 Y"
+		},
+		{
+			"Id": "ParamAngleZ",
+			"GroupId": "",
+			"Name": "角度 Z"
+		},
+		{
+			"Id": "Param17",
+			"GroupId": "",
+			"Name": "手势捧兔"
+		},
+		{
+			"Id": "Param18",
+			"GroupId": "",
+			"Name": "害羞"
+		},
+		{
+			"Id": "Param19",
+			"GroupId": "",
+			"Name": "哭哭"
+		},
+		{
+			"Id": "Param20",
+			"GroupId": "",
+			"Name": "生气"
+		},
+		{
+			"Id": "Param13",
+			"GroupId": "",
+			"Name": "右耳1"
+		},
+		{
+			"Id": "Param14",
+			"GroupId": "",
+			"Name": "右耳2"
+		},
+		{
+			"Id": "Param15",
+			"GroupId": "",
+			"Name": "左耳1"
+		},
+		{
+			"Id": "Param16",
+			"GroupId": "",
+			"Name": "左耳2"
+		},
+		{
+			"Id": "Param9",
+			"GroupId": "",
+			"Name": "右眼1"
+		},
+		{
+			"Id": "Param10",
+			"GroupId": "",
+			"Name": "右眼2"
+		},
+		{
+			"Id": "Param11",
+			"GroupId": "",
+			"Name": "左眼1"
+		},
+		{
+			"Id": "Param12",
+			"GroupId": "",
+			"Name": "左眼2"
+		},
+		{
+			"Id": "Param7",
+			"GroupId": "",
+			"Name": "衣服1"
+		},
+		{
+			"Id": "Param8",
+			"GroupId": "",
+			"Name": "衣服2"
+		},
+		{
+			"Id": "Param",
+			"GroupId": "",
+			"Name": "左发1"
+		},
+		{
+			"Id": "Param2",
+			"GroupId": "",
+			"Name": "左发2"
+		},
+		{
+			"Id": "Param5",
+			"GroupId": "",
+			"Name": "右X1"
+		},
+		{
+			"Id": "Param6",
+			"GroupId": "",
+			"Name": "右X2"
+		},
+		{
+			"Id": "Param3",
+			"GroupId": "",
+			"Name": "右Y1"
+		},
+		{
+			"Id": "Param4",
+			"GroupId": "",
+			"Name": "右Y2"
+		},
+		{
+			"Id": "ParamEyeLOpen",
+			"GroupId": "",
+			"Name": "左眼　开闭"
+		},
+		{
+			"Id": "ParamEyeLSmile",
+			"GroupId": "",
+			"Name": "左眼　微笑"
+		},
+		{
+			"Id": "ParamEyeROpen",
+			"GroupId": "",
+			"Name": "右眼"
+		},
+		{
+			"Id": "ParamEyeRSmile",
+			"GroupId": "",
+			"Name": "右眼　微笑"
+		},
+		{
+			"Id": "ParamMouthForm",
+			"GroupId": "",
+			"Name": "嘴　变形"
+		},
+		{
+			"Id": "ParamMouthOpenY",
+			"GroupId": "",
+			"Name": "嘴　张开和闭合"
+		},
+		{
+			"Id": "ParamEyeBallX",
+			"GroupId": "",
+			"Name": "眼珠 X"
+		},
+		{
+			"Id": "ParamEyeBallY",
+			"GroupId": "",
+			"Name": "眼珠 Y"
+		},
+		{
+			"Id": "ParamBrowLY",
+			"GroupId": "",
+			"Name": "左眉上下"
+		},
+		{
+			"Id": "ParamBrowRY",
+			"GroupId": "",
+			"Name": "右眉　上下"
+		},
+		{
+			"Id": "ParamBrowLX",
+			"GroupId": "",
+			"Name": "左眉　左右"
+		},
+		{
+			"Id": "ParamBrowRX",
+			"GroupId": "",
+			"Name": "右眉　左右"
+		},
+		{
+			"Id": "ParamBrowLAngle",
+			"GroupId": "",
+			"Name": "左眉　角度"
+		},
+		{
+			"Id": "ParamBrowRAngle",
+			"GroupId": "",
+			"Name": "右眉　角度"
+		},
+		{
+			"Id": "ParamBrowLForm",
+			"GroupId": "",
+			"Name": "左眉　変形"
+		},
+		{
+			"Id": "ParamBrowRForm",
+			"GroupId": "",
+			"Name": "右眉　変形"
+		},
+		{
+			"Id": "ParamCheek",
+			"GroupId": "",
+			"Name": "脸颊泛红"
+		},
+		{
+			"Id": "ParamBodyAngleX",
+			"GroupId": "",
+			"Name": "身体旋转　X"
+		},
+		{
+			"Id": "ParamBodyAngleY",
+			"GroupId": "",
+			"Name": "身体旋转　Y"
+		},
+		{
+			"Id": "ParamBodyAngleZ",
+			"GroupId": "",
+			"Name": "身体旋转　Z"
+		},
+		{
+			"Id": "ParamBreath",
+			"GroupId": "",
+			"Name": "呼吸"
+		},
+		{
+			"Id": "ParamHairFront",
+			"GroupId": "",
+			"Name": "摇动 前发"
+		},
+		{
+			"Id": "ParamHairSide",
+			"GroupId": "",
+			"Name": "摇动 侧发"
+		},
+		{
+			"Id": "ParamHairBack",
+			"GroupId": "",
+			"Name": "摇动 后发"
+		},
+		{
+			"Id": "Param_Angle_Rotation4",
+			"GroupId": "ParamGroup",
+			"Name": "[0]左手"
+		},
+		{
+			"Id": "Param_Angle_Rotation5",
+			"GroupId": "ParamGroup",
+			"Name": "[1]左手"
+		},
+		{
+			"Id": "Param_Angle_Rotation6",
+			"GroupId": "ParamGroup",
+			"Name": "[2]左手"
+		},
+		{
+			"Id": "Param_Angle_Rotation7",
+			"GroupId": "ParamGroup",
+			"Name": "[3]左手"
+		},
+		{
+			"Id": "Param_Angle_Rotation8",
+			"GroupId": "ParamGroup",
+			"Name": "[4]左手"
+		},
+		{
+			"Id": "Param_Angle_Rotation9",
+			"GroupId": "ParamGroup2",
+			"Name": "[0]右手"
+		},
+		{
+			"Id": "Param_Angle_Rotation10",
+			"GroupId": "ParamGroup2",
+			"Name": "[1]右手"
+		},
+		{
+			"Id": "Param_Angle_Rotation11",
+			"GroupId": "ParamGroup2",
+			"Name": "[2]右手"
+		},
+		{
+			"Id": "Param_Angle_Rotation12",
+			"GroupId": "ParamGroup2",
+			"Name": "[3]右手"
+		},
+		{
+			"Id": "Param_Angle_Rotation13",
+			"GroupId": "ParamGroup2",
+			"Name": "[4]右手"
+		}
+	],
+	"ParameterGroups": [
+		{
+			"Id": "ParamGroup",
+			"GroupId": "",
+			"Name": "左手"
+		},
+		{
+			"Id": "ParamGroup2",
+			"GroupId": "",
+			"Name": "右手"
+		}
+	],
+	"Parts": [
+		{
+			"Id": "Part",
+			"Name": "动作手势"
+		},
+		{
+			"Id": "Part3",
+			"Name": "表情"
+		},
+		{
+			"Id": "Part7",
+			"Name": "脸"
+		},
+		{
+			"Id": "Part18",
+			"Name": "领结"
+		},
+		{
+			"Id": "Part19",
+			"Name": "大蝴蝶结"
+		},
+		{
+			"Id": "Part21",
+			"Name": "斗篷"
+		},
+		{
+			"Id": "Part23",
+			"Name": "上衣"
+		},
+		{
+			"Id": "Part24",
+			"Name": "粉裙子"
+		},
+		{
+			"Id": "Part25",
+			"Name": "腿部"
+		},
+		{
+			"Id": "ArtMesh178_Skinning",
+			"Name": "上手臂L(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh179_Skinning",
+			"Name": "上手臂R(蒙皮)"
+		},
+		{
+			"Id": "Part26",
+			"Name": "手R"
+		},
+		{
+			"Id": "Part27",
+			"Name": "手L"
+		},
+		{
+			"Id": "Part28",
+			"Name": "后发1"
+		},
+		{
+			"Id": "Part29",
+			"Name": "贝雷帽"
+		},
+		{
+			"Id": "PartSketch0",
+			"Name": "[ 参考图 ]"
+		},
+		{
+			"Id": "Part2",
+			"Name": "兔兔"
+		},
+		{
+			"Id": "Part4",
+			"Name": "害羞"
+		},
+		{
+			"Id": "Part5",
+			"Name": "哭哭"
+		},
+		{
+			"Id": "Part6",
+			"Name": "生气"
+		},
+		{
+			"Id": "Part8",
+			"Name": "鼻子"
+		},
+		{
+			"Id": "Part11",
+			"Name": "眼睛R"
+		},
+		{
+			"Id": "Part13",
+			"Name": "嘴巴"
+		},
+		{
+			"Id": "Part14",
+			"Name": "蝴蝶结发夹"
+		},
+		{
+			"Id": "Part15",
+			"Name": "前发"
+		},
+		{
+			"Id": "Part16",
+			"Name": "耳朵"
+		},
+		{
+			"Id": "Part17",
+			"Name": "脸"
+		},
+		{
+			"Id": "Part20",
+			"Name": "大蝴蝶结2"
+		},
+		{
+			"Id": "Part22",
+			"Name": "手势-披肩"
+		},
+		{
+			"Id": "ArtMesh183_Skinning",
+			"Name": "袖子R(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh184_Skinning",
+			"Name": "手R阴影(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh185_Skinning",
+			"Name": "手R(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh186_Skinning",
+			"Name": "中指R(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh187_Skinning",
+			"Name": "无名指R(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh188_Skinning",
+			"Name": "尾指R(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh189_Skinning",
+			"Name": "袖子后片R(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh190_Skinning",
+			"Name": "袖子L(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh191_Skinning",
+			"Name": "手L阴影(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh192_Skinning",
+			"Name": "手L(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh193_Skinning",
+			"Name": "中指L(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh194_Skinning",
+			"Name": "无名指L(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh195_Skinning",
+			"Name": "尾指L(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh196_Skinning",
+			"Name": "袖子后片(蒙皮)"
+		},
+		{
+			"Id": "Part12",
+			"Name": "眼珠R"
+		}
+	]
+}
