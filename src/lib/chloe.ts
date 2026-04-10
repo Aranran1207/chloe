@@ -23,6 +23,8 @@ export class ChloeLive2D {
   private _initialized: boolean;
   private _running: boolean;
   private _animationFrameId: number;
+  private _pendingTransform: { scale: number; offsetX: number; offsetY: number } | null;
+  private _transformApplied: boolean;
 
   private constructor() {
     this._config = { ...DefaultConfig };
@@ -36,6 +38,8 @@ export class ChloeLive2D {
     this._initialized = false;
     this._running = false;
     this._animationFrameId = null;
+    this._pendingTransform = null;
+    this._transformApplied = false;
   }
 
   public static getInstance(): ChloeLive2D {
@@ -132,6 +136,7 @@ export class ChloeLive2D {
 
     this._model = new ChloeModel(this);
     this._model.loadAssets(modelPath, modelFileName);
+    this._transformApplied = false;
   }
 
   public start(): void {
@@ -171,6 +176,11 @@ export class ChloeLive2D {
 
     if (this._model) {
       this._model.update();
+      
+      if (!this._transformApplied && this._model.isInitialized() && this._pendingTransform) {
+        this.applyTransform();
+        this._transformApplied = true;
+      }
     }
   }
 
@@ -198,6 +208,7 @@ export class ChloeLive2D {
       } else {
         projection.scale(height / width, 1.0);
       }
+      
       projection.multiplyByMatrix(this._viewMatrix);
     }
 
@@ -207,6 +218,26 @@ export class ChloeLive2D {
   public setDragging(x: number, y: number): void {
     if (this._model) {
       this._model.setDragging(x, y);
+    }
+  }
+
+  public setModelTransform(scale: number, offsetX: number, offsetY: number): void {
+    this._pendingTransform = { scale, offsetX, offsetY };
+    
+    if (this._model && this._model.isInitialized()) {
+      this.applyTransform();
+      this._transformApplied = true;
+    }
+  }
+
+  private applyTransform(): void {
+    if (!this._pendingTransform || !this._model) return;
+    
+    const modelMatrix = this._model.getModelMatrix();
+    if (modelMatrix) {
+      modelMatrix.loadIdentity();
+      modelMatrix.scale(this._pendingTransform.scale, this._pendingTransform.scale);
+      modelMatrix.translate(this._pendingTransform.offsetX, this._pendingTransform.offsetY);
     }
   }
 

@@ -66,8 +66,13 @@
     <SettingsPanel 
       :visible="showSettings" 
       :currentPath="modelBasePath"
+      :currentScale="modelScale"
+      :currentOffsetX="modelOffsetX"
+      :currentOffsetY="modelOffsetY"
       @close="showSettings = false"
+      @cancel="handleCancelSettings"
       @save="handleSaveSettings"
+      @updateTransform="handleUpdateTransform"
     />
   </div>
 </template>
@@ -99,6 +104,9 @@ const modelList = ref<ModelInfo[]>([]);
 const currentModel = ref<ModelInfo | null>(null);
 const isLoading = ref(true);
 const loadingText = ref('正在加载模型...');
+const modelScale = ref(1.0);
+const modelOffsetX = ref(0.0);
+const modelOffsetY = ref(-0.3);
 let chloe: typeof ChloeLive2D | null = null;
 let isMouseDown = false;
 let isDragging = false;
@@ -283,19 +291,53 @@ const switchModel = async (model: ModelInfo) => {
   }, 500);
 };
 
-const handleSaveSettings = async (path: string) => {
-  let normalizedPath = path;
+const handleSaveSettings = async (settings: { 
+  path: string; 
+  scale: number; 
+  offsetX: number; 
+  offsetY: number;
+}) => {
+  let normalizedPath = settings.path;
   if (!normalizedPath.endsWith('/') && !normalizedPath.endsWith('\\')) {
     normalizedPath += '/';
   }
   
   modelBasePath.value = normalizedPath;
+  modelScale.value = settings.scale;
+  modelOffsetX.value = settings.offsetX;
+  modelOffsetY.value = settings.offsetY;
   
   if (window.electronAPI) {
-    await window.electronAPI.setConfig({ modelPath: normalizedPath });
+    await window.electronAPI.setConfig({ 
+      modelPath: normalizedPath,
+      modelScale: settings.scale,
+      modelOffsetX: settings.offsetX,
+      modelOffsetY: settings.offsetY
+    });
+  }
+  
+  if (chloe) {
+    chloe.setModelTransform(settings.scale, settings.offsetX, settings.offsetY);
   }
   
   modelList.value = await window.electronAPI.getModelList();
+};
+
+const handleUpdateTransform = (settings: { 
+  scale: number; 
+  offsetX: number; 
+  offsetY: number;
+}) => {
+  if (chloe) {
+    chloe.setModelTransform(settings.scale, settings.offsetX, settings.offsetY);
+  }
+};
+
+const handleCancelSettings = () => {
+  showSettings.value = false;
+  if (chloe) {
+    chloe.setModelTransform(modelScale.value, modelOffsetX.value, modelOffsetY.value);
+  }
 };
 
 const loadConfig = async () => {
@@ -307,6 +349,15 @@ const loadConfig = async () => {
         path += '/';
       }
       modelBasePath.value = path;
+    }
+    if (config.modelScale !== undefined) {
+      modelScale.value = config.modelScale;
+    }
+    if (config.modelOffsetX !== undefined) {
+      modelOffsetX.value = config.modelOffsetX;
+    }
+    if (config.modelOffsetY !== undefined) {
+      modelOffsetY.value = config.modelOffsetY;
     }
     modelList.value = await window.electronAPI.getModelList();
     
@@ -358,7 +409,7 @@ const handleGlobalMouseMove = async (data: { x: number; y: number }) => {
       
       chloe.setDragging(clampedX, clampedY);
     } catch (error) {
-      console.error('Error in eye tracking:', error);
+      // 静默处理错误
     }
   }
 };
@@ -392,6 +443,8 @@ onMounted(async () => {
         const modelFile = '藿藿.model3.json';
         chloe.loadModel(modelPath, modelFile);
       }
+      
+      chloe.setModelTransform(modelScale.value, modelOffsetX.value, modelOffsetY.value);
       chloe.start();
     }
 

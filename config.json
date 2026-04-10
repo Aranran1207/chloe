@@ -1,8 +1,11 @@
 {
   "modelPath": "D:\\workplace\\develop\\Chloe\\chloe\\public\\resources/",
   "currentModel": {
-    "name": "藿藿",
-    "path": "藿藿/",
-    "file": "藿藿.model3.json"
-  }
+    "name": "fense",
+    "path": "fense/",
+    "file": "fense.model3.json"
+  },
+  "modelScale": 2,
+  "modelOffsetX": 0,
+  "modelOffsetY": -0.8
 }

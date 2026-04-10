@@ -19,7 +19,7 @@ export class ChloePal {
   }
 
   public static printMessage(message: string): void {
-    console.log(message);
+    // 静默处理日志
   }
 
   static lastUpdate = Date.now();

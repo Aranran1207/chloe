@@ -8,7 +8,10 @@ let mainWindow;
 let configPath;
 let config = {
   modelPath: './resources/',
-  currentModel: null
+  currentModel: null,
+  modelScale: 1.0,
+  modelOffsetX: 0.0,
+  modelOffsetY: 0.0
 };
 
 function loadConfig() {
@@ -37,12 +40,15 @@ function saveConfig() {
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const windowWidth = 500;
+  const windowHeight = 800;
+  const margin = 20;
 
   mainWindow = new BrowserWindow({
-    width: 500,
-    height: 800,
-    x: width - 550,
-    y: height - 850,
+    width: windowWidth,
+    height: windowHeight,
+    x: width - windowWidth - margin,
+    y: height - windowHeight - margin,
     frame: false,
     transparent: true,
     alwaysOnTop: true,

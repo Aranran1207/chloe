@@ -1,7 +1,7 @@
 <template>
   <Transition name="panel-fade">
-    <div v-if="visible" class="settings-overlay" @click.self="$emit('close')">
-      <div class="settings-panel">
+    <div v-if="visible" class="settings-overlay" :class="{ 'is-sliding': isSliding }" @click.self="$emit('cancel')">
+      <div class="settings-panel" :class="{ 'is-sliding': isSliding }">
         <div class="panel-header">
           <h2>设置</h2>
           <button class="close-btn" @click="$emit('close')">
@@ -26,9 +26,69 @@
             <p class="hint">例如: ./resources/ 或 D:/Live2D/models/</p>
           </div>
           
+          <div class="setting-group">
+            <label>模型缩放比例</label>
+            <div class="slider-container">
+              <input 
+                type="range" 
+                v-model.number="modelScale" 
+                min="0.5" 
+                max="2.0" 
+                step="0.1"
+                class="slider"
+                @mousedown.stop="startSliding"
+                @mouseup="stopSliding"
+                @touchstart.stop="startSliding"
+                @touchend="stopSliding"
+                @input="updateTransform"
+              />
+              <span class="slider-value">{{ modelScale.toFixed(1) }}x</span>
+            </div>
+          </div>
+          
+          <div class="setting-group">
+            <label>水平位置偏移</label>
+            <div class="slider-container">
+              <input 
+                type="range" 
+                v-model.number="modelOffsetX" 
+                min="-2.0" 
+                max="2.0" 
+                step="0.1"
+                class="slider"
+                @mousedown.stop="startSliding"
+                @mouseup="stopSliding"
+                @touchstart.stop="startSliding"
+                @touchend="stopSliding"
+                @input="updateTransform"
+              />
+              <span class="slider-value">{{ modelOffsetX.toFixed(1) }}</span>
+            </div>
+          </div>
+          
+          <div class="setting-group">
+            <label>垂直位置偏移</label>
+            <div class="slider-container">
+              <input 
+                type="range" 
+                v-model.number="modelOffsetY" 
+                min="-1.0" 
+                max="1.0" 
+                step="0.1"
+                class="slider"
+                @mousedown.stop="startSliding"
+                @mouseup="stopSliding"
+                @touchstart.stop="startSliding"
+                @touchend="stopSliding"
+                @input="updateTransform"
+              />
+              <span class="slider-value">{{ modelOffsetY.toFixed(1) }}</span>
+            </div>
+          </div>
+          
           <div class="setting-actions">
             <button class="btn btn-primary" @click="saveSettings">保存设置</button>
-            <button class="btn btn-secondary" @click="$emit('close')">取消</button>
+            <button class="btn btn-secondary" @click="$emit('cancel')">取消</button>
           </div>
         </div>
       </div>
@@ -42,18 +102,57 @@ import { ref, watch } from 'vue';
 const props = defineProps<{
   visible: boolean;
   currentPath: string;
+  currentScale: number;
+  currentOffsetX: number;
+  currentOffsetY: number;
 }>();
 
 const emit = defineEmits<{
   close: [];
-  save: [path: string];
+  cancel: [];
+  save: [settings: {
+    path: string;
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+  }];
+  updateTransform: [settings: {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+  }];
 }>();
 
 const modelPath = ref(props.currentPath);
+const modelScale = ref(props.currentScale);
+const modelOffsetX = ref(props.currentOffsetX);
+const modelOffsetY = ref(props.currentOffsetY);
+const isSliding = ref(false);
 
-watch(() => props.currentPath, (newPath) => {
-  modelPath.value = newPath;
+watch(() => props.visible, (visible) => {
+  if (visible) {
+    modelPath.value = props.currentPath;
+    modelScale.value = props.currentScale;
+    modelOffsetX.value = props.currentOffsetX;
+    modelOffsetY.value = props.currentOffsetY;
+  }
 });
+
+const startSliding = () => {
+  isSliding.value = true;
+};
+
+const stopSliding = () => {
+  isSliding.value = false;
+};
+
+const updateTransform = () => {
+  emit('updateTransform', {
+    scale: modelScale.value,
+    offsetX: modelOffsetX.value,
+    offsetY: modelOffsetY.value
+  });
+};
 
 const browseFolder = async () => {
   if (window.electronAPI && window.electronAPI.openFolderDialog) {
@@ -65,7 +164,12 @@ const browseFolder = async () => {
 };
 
 const saveSettings = () => {
-  emit('save', modelPath.value);
+  emit('save', {
+    path: modelPath.value,
+    scale: modelScale.value,
+    offsetX: modelOffsetX.value,
+    offsetY: modelOffsetY.value
+  });
   emit('close');
 };
 </script>
@@ -83,6 +187,12 @@ const saveSettings = () => {
   align-items: center;
   justify-content: center;
   z-index: 2000;
+  transition: all 0.3s ease;
+}
+
+.settings-overlay.is-sliding {
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(1px);
 }
 
 .settings-panel {
@@ -91,8 +201,16 @@ const saveSettings = () => {
   border-radius: 16px;
   width: 450px;
   max-width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.settings-panel.is-sliding {
+  background: linear-gradient(135deg, rgba(40, 40, 50, 0.3) 0%, rgba(30, 30, 40, 0.4) 100%);
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
 .panel-header {
@@ -101,6 +219,16 @@ const saveSettings = () => {
   justify-content: space-between;
   padding: 20px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  background: linear-gradient(135deg, rgba(40, 40, 50, 0.98) 0%, rgba(30, 30, 40, 0.99) 100%);
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+
+.settings-panel.is-sliding .panel-header {
+  background: linear-gradient(135deg, rgba(40, 40, 50, 0.3) 0%, rgba(30, 30, 40, 0.4) 100%);
+  border-bottom-color: rgba(255, 255, 255, 0.05);
 }
 
 .panel-header h2 {
@@ -199,10 +327,70 @@ const saveSettings = () => {
   color: rgba(255, 255, 255, 0.4);
 }
 
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.slider {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+.slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+.slider-value {
+  min-width: 50px;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
 .setting-actions {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .btn {
