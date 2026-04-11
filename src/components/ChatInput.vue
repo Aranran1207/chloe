@@ -36,7 +36,6 @@ import { ref, watch, nextTick, computed } from 'vue';
 const props = defineProps<{
   visible: boolean;
   bubbleColor?: string;
-  bubbleOpacity?: number;
 }>();
 
 const emit = defineEmits<{

@@ -24,7 +24,6 @@ const props = defineProps<{
   visible: boolean;
   text: string;
   bubbleColor?: string;
-  bubbleOpacity?: number;
   streamMode?: boolean;
 }>();
 
@@ -44,7 +43,6 @@ const MAX_HEIGHT = 200;
 const BOTTOM_OFFSET = 220;
 
 const color = computed(() => props.bubbleColor || '#8b5cf6');
-const opacity = computed(() => props.bubbleOpacity ?? 0.95);
 
 const hexToRgba = (hex: string, alpha: number) => {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -53,19 +51,13 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-const darkenColor = (hex: string, factor: number) => {
-  const r = Math.floor(parseInt(hex.slice(1, 3), 16) * factor);
-  const g = Math.floor(parseInt(hex.slice(3, 5), 16) * factor);
-  const b = Math.floor(parseInt(hex.slice(5, 7), 16) * factor);
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-};
-
 const containerStyle = computed(() => ({
   bottom: `${BOTTOM_OFFSET}px`,
 }));
 
 const contentStyle = computed(() => ({
-  background: `linear-gradient(135deg, ${hexToRgba(color.value, opacity.value)} 0%, ${hexToRgba(darkenColor(color.value, 0.9), opacity.value)} 50%, ${hexToRgba(darkenColor(color.value, 0.8), opacity.value)} 100%)`,
+  background: hexToRgba(color.value, 0.15),
+  borderColor: hexToRgba(color.value, 0.3),
 }));
 
 const checkAndScrollContent = () => {
@@ -215,31 +207,16 @@ const onAfterLeave = () => {
 }
 
 .bubble-content {
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-radius: 20px;
-  padding: 14px 18px;
+  border: 1px solid;
+  border-radius: 16px;
+  padding: 12px 16px;
   max-width: 320px;
   min-width: 80px;
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   position: relative;
   transition: height 0.1s ease-out;
-}
-
-.bubble-content::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 100%);
-  border-radius: 18px 18px 0 0;
-  pointer-events: none;
 }
 
 .bubble-inner {
@@ -250,12 +227,12 @@ const onAfterLeave = () => {
 }
 
 .bubble-text {
-  color: white;
+  color: rgba(255, 255, 255, 0.95);
   font-size: 14px;
   font-weight: 500;
   line-height: 1.6;
   word-break: break-word;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   letter-spacing: 0.3px;
 }
 
@@ -270,7 +247,7 @@ const onAfterLeave = () => {
 .typing-indicator .dot {
   width: 4px;
   height: 4px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.8);
   border-radius: 50%;
   animation: typingDot 1.4s ease-in-out infinite;
 }
@@ -303,7 +280,7 @@ const onAfterLeave = () => {
 }
 
 .chat-bubble-pop-leave-active {
-  animation: bubbleFadeOut 0.4s ease-in forwards;
+  animation: bubbleFadeOutUp 0.6s ease-out forwards;
 }
 
 @keyframes bubbleFloatUp {
@@ -317,14 +294,14 @@ const onAfterLeave = () => {
   }
 }
 
-@keyframes bubbleFadeOut {
+@keyframes bubbleFadeOutUp {
   0% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
   100% {
     opacity: 0;
-    transform: translateY(-20px) scale(0.9);
+    transform: translateY(-30px);
   }
 }
 </style>

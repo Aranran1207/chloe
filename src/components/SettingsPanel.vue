@@ -100,25 +100,6 @@
           </div>
           
           <div class="setting-group">
-            <label>气泡透明度</label>
-            <div class="slider-container">
-              <input 
-                type="range" 
-                v-model.number="bubbleOpacity" 
-                min="0.3" 
-                max="1.0" 
-                step="0.05"
-                class="slider"
-                @mousedown.stop="startSliding"
-                @mouseup="stopSliding"
-                @touchstart.stop="startSliding"
-                @touchend="stopSliding"
-              />
-              <span class="slider-value">{{ (bubbleOpacity * 100).toFixed(0) }}%</span>
-            </div>
-          </div>
-          
-          <div class="setting-group">
             <label>注视鼠标</label>
             <div class="toggle-container">
               <label class="toggle">
@@ -149,7 +130,6 @@ const props = defineProps<{
   currentOffsetX: number;
   currentOffsetY: number;
   currentBubbleColor: string;
-  currentBubbleOpacity: number;
   currentEyeTracking: boolean;
 }>();
 
@@ -162,7 +142,6 @@ const emit = defineEmits<{
     offsetX: number;
     offsetY: number;
     bubbleColor: string;
-    bubbleOpacity: number;
     eyeTracking: boolean;
   }];
   updateTransform: [settings: {
@@ -177,7 +156,6 @@ const modelScale = ref(props.currentScale);
 const modelOffsetX = ref(props.currentOffsetX);
 const modelOffsetY = ref(props.currentOffsetY);
 const bubbleColor = ref(props.currentBubbleColor);
-const bubbleOpacity = ref(props.currentBubbleOpacity);
 const eyeTracking = ref(props.currentEyeTracking);
 const isSliding = ref(false);
 
@@ -188,7 +166,6 @@ watch(() => props.visible, (visible) => {
     modelOffsetX.value = props.currentOffsetX;
     modelOffsetY.value = props.currentOffsetY;
     bubbleColor.value = props.currentBubbleColor || '#8b5cf6';
-    bubbleOpacity.value = props.currentBubbleOpacity ?? 0.95;
     eyeTracking.value = props.currentEyeTracking ?? true;
   }
 });
@@ -225,7 +202,6 @@ const saveSettings = () => {
     offsetX: modelOffsetX.value,
     offsetY: modelOffsetY.value,
     bubbleColor: bubbleColor.value,
-    bubbleOpacity: bubbleOpacity.value,
     eyeTracking: eyeTracking.value
   });
   emit('close');

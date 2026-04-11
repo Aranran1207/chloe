@@ -21,7 +21,6 @@
       :visible="showBubble"
       :text="bubbleText"
       :bubbleColor="bubbleColor"
-      :bubbleOpacity="bubbleOpacity"
       :streamMode="isStreaming"
       @disappear="showBubble = false"
     />
@@ -87,7 +86,6 @@
       :currentOffsetX="modelOffsetX"
       :currentOffsetY="modelOffsetY"
       :currentBubbleColor="bubbleColor"
-      :currentBubbleOpacity="bubbleOpacity"
       :currentEyeTracking="eyeTrackingEnabled"
       @close="showSettings = false"
       @cancel="handleCancelSettings"
@@ -98,7 +96,6 @@
     <ChatInput 
       :visible="showChatInput"
       :bubbleColor="bubbleColor"
-      :bubbleOpacity="bubbleOpacity"
       @send="handleSendMessage"
       @cancel="showChatInput = false"
     />
@@ -167,7 +164,6 @@ const bubbleText = ref('');
 const isProcessing = ref(false);
 const isStreaming = ref(false);
 const bubbleColor = ref('#8b5cf6');
-const bubbleOpacity = ref(0.95);
 
 const showThinking = ref(false);
 const thinkingPosition = ref({ x: 250, y: 350 });
@@ -395,7 +391,6 @@ const handleSaveSettings = async (settings: {
   offsetX: number; 
   offsetY: number;
   bubbleColor: string;
-  bubbleOpacity: number;
   eyeTracking: boolean;
 }) => {
   let normalizedPath = settings.path;
@@ -408,7 +403,6 @@ const handleSaveSettings = async (settings: {
   modelOffsetX.value = settings.offsetX;
   modelOffsetY.value = settings.offsetY;
   bubbleColor.value = settings.bubbleColor;
-  bubbleOpacity.value = settings.bubbleOpacity;
   
   if (settings.eyeTracking !== eyeTrackingEnabled.value) {
     eyeTrackingEnabled.value = settings.eyeTracking;
@@ -429,7 +423,6 @@ const handleSaveSettings = async (settings: {
       modelOffsetX: settings.offsetX,
       modelOffsetY: settings.offsetY,
       bubbleColor: settings.bubbleColor,
-      bubbleOpacity: settings.bubbleOpacity,
       eyeTracking: settings.eyeTracking
     }).then(() => {
       saveToastText.value = '保存成功';
@@ -483,9 +476,6 @@ const loadConfig = async () => {
     }
     if (config.bubbleColor !== undefined) {
       bubbleColor.value = config.bubbleColor;
-    }
-    if (config.bubbleOpacity !== undefined) {
-      bubbleOpacity.value = config.bubbleOpacity;
     }
     if (config.eyeTracking !== undefined) {
       eyeTrackingEnabled.value = config.eyeTracking;
