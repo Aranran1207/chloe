@@ -13,7 +13,9 @@ let config = {
   modelOffsetX: 0.0,
   modelOffsetY: 0.0,
   bubbleColor: '#8b5cf6',
-  eyeTracking: true
+  eyeTracking: true,
+  systemPrompt: '',
+  girlfriendName: ''
 };
 
 function loadConfig() {

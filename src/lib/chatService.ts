@@ -6,10 +6,20 @@ export interface ChatMessage {
 const OLLAMA_API_URL = 'http://localhost:11434';
 const OLLAMA_MODEL = 'qwen3.5:9b';
 
-const SYSTEM_PROMPT = '你是Chloe，一个可爱的Live2D桌面宠物。请用简短、可爱、友好的语气回复';
+const buildDefaultPrompt = (name: string, modelName?: string): string => {
+  const displayName = name || modelName || 'Chloe';
+  return `你是${displayName}，我的女友。请用可爱的语气回复，称呼我为"亲爱的"。`;
+};
 
-export async function sendMessage(message: string): Promise<string> {
+export async function sendMessage(
+  message: string, 
+  systemPrompt?: string,
+  girlfriendName?: string,
+  modelName?: string
+): Promise<string> {
   const startTime = performance.now();
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName);
+  
   console.log('[Ollama] 发送请求:', {
     model: OLLAMA_MODEL,
     message: message,
@@ -27,7 +37,7 @@ export async function sendMessage(message: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: SYSTEM_PROMPT
+            content: prompt
           },
           {
             role: 'user',
@@ -66,9 +76,14 @@ export async function sendMessage(message: string): Promise<string> {
 
 export async function sendMessageStream(
   message: string,
-  onToken: (token: string) => void
+  onToken: (token: string) => void,
+  systemPrompt?: string,
+  girlfriendName?: string,
+  modelName?: string
 ): Promise<string> {
   const startTime = performance.now();
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName);
+  
   console.log('[Ollama] 发送流式请求:', {
     model: OLLAMA_MODEL,
     message: message,
@@ -86,7 +101,7 @@ export async function sendMessageStream(
         messages: [
           {
             role: 'system',
-            content: SYSTEM_PROMPT
+            content: prompt
           },
           {
             role: 'user',
@@ -167,9 +182,14 @@ export async function sendMessageStream(
 
 export async function sendMessageWithHistory(
   message: string,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  systemPrompt?: string,
+  girlfriendName?: string,
+  modelName?: string
 ): Promise<string> {
   const startTime = performance.now();
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName);
+  
   console.log('[Ollama] 发送请求(带历史):', {
     model: OLLAMA_MODEL,
     message: message,
@@ -181,7 +201,7 @@ export async function sendMessageWithHistory(
     const messages = [
       {
         role: 'system',
-        content: SYSTEM_PROMPT
+        content: prompt
       },
       ...history.map(msg => ({
         role: msg.role,
@@ -234,9 +254,14 @@ export async function sendMessageWithHistory(
 export async function sendMessageWithHistoryStream(
   message: string,
   history: ChatMessage[],
-  onToken: (token: string) => void
+  onToken: (token: string) => void,
+  systemPrompt?: string,
+  girlfriendName?: string,
+  modelName?: string
 ): Promise<string> {
   const startTime = performance.now();
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName);
+  
   console.log('[Ollama] 发送流式请求(带历史):', {
     model: OLLAMA_MODEL,
     message: message,
@@ -248,7 +273,7 @@ export async function sendMessageWithHistoryStream(
     const messages = [
       {
         role: 'system',
-        content: SYSTEM_PROMPT
+        content: prompt
       },
       ...history.map(msg => ({
         role: msg.role,

@@ -26,6 +26,8 @@
 - **缩放比例** - 调整模型大小（0.5x - 2.0x）
 - **位置偏移** - 调整模型水平和垂直位置
 - **气泡颜色** - 自定义气泡和发送按钮颜色
+- **女友名字** - 给女友起个名字
+- **角色设定** - 自定义角色的性格、说话风格等
 - **注视鼠标** - 开关鼠标追踪功能
 
 ### 右键菜单
@@ -131,7 +133,9 @@ npm run electron:build
   "modelOffsetX": 0.0,
   "modelOffsetY": -0.3,
   "bubbleColor": "#8b5cf6",
-  "eyeTracking": true
+  "eyeTracking": true,
+  "systemPrompt": "",
+  "girlfriendName": ""
 }
 ```
 

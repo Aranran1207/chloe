@@ -100,6 +100,29 @@
           </div>
           
           <div class="setting-group">
+            <label>女友名字</label>
+            <input 
+              v-model="girlfriendName" 
+              type="text" 
+              class="name-input"
+              placeholder="给女友起个名字吧~"
+              maxlength="20"
+            />
+            <p class="hint">这个名字会用于对话中</p>
+          </div>
+          
+          <div class="setting-group">
+            <label>角色设定</label>
+            <textarea 
+              v-model="systemPrompt" 
+              class="prompt-textarea"
+              placeholder="输入角色的性格、说话风格等设定..."
+              rows="4"
+            ></textarea>
+            <p class="hint">定义角色的性格、说话风格等，留空使用默认设定</p>
+          </div>
+          
+          <div class="setting-group">
             <label>注视鼠标</label>
             <div class="toggle-container">
               <label class="toggle">
@@ -131,6 +154,8 @@ const props = defineProps<{
   currentOffsetY: number;
   currentBubbleColor: string;
   currentEyeTracking: boolean;
+  currentSystemPrompt?: string;
+  currentGirlfriendName?: string;
 }>();
 
 const emit = defineEmits<{
@@ -143,6 +168,8 @@ const emit = defineEmits<{
     offsetY: number;
     bubbleColor: string;
     eyeTracking: boolean;
+    systemPrompt: string;
+    girlfriendName: string;
   }];
   updateTransform: [settings: {
     scale: number;
@@ -157,6 +184,8 @@ const modelOffsetX = ref(props.currentOffsetX);
 const modelOffsetY = ref(props.currentOffsetY);
 const bubbleColor = ref(props.currentBubbleColor);
 const eyeTracking = ref(props.currentEyeTracking);
+const systemPrompt = ref('');
+const girlfriendName = ref('');
 const isSliding = ref(false);
 
 watch(() => props.visible, (visible) => {
@@ -167,6 +196,8 @@ watch(() => props.visible, (visible) => {
     modelOffsetY.value = props.currentOffsetY;
     bubbleColor.value = props.currentBubbleColor || '#8b5cf6';
     eyeTracking.value = props.currentEyeTracking ?? true;
+    systemPrompt.value = props.currentSystemPrompt || '';
+    girlfriendName.value = props.currentGirlfriendName || '';
   }
 });
 
@@ -202,7 +233,9 @@ const saveSettings = () => {
     offsetX: modelOffsetX.value,
     offsetY: modelOffsetY.value,
     bubbleColor: bubbleColor.value,
-    eyeTracking: eyeTracking.value
+    eyeTracking: eyeTracking.value,
+    systemPrompt: systemPrompt.value,
+    girlfriendName: girlfriendName.value
   });
   emit('close');
 };
@@ -359,6 +392,53 @@ const saveSettings = () => {
   margin: 8px 0 0;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.4);
+}
+
+.name-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.name-input:focus {
+  outline: none;
+  border-color: rgba(100, 150, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.name-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.prompt-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.prompt-textarea:focus {
+  outline: none;
+  border-color: rgba(100, 150, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.prompt-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .slider-container {

@@ -87,6 +87,8 @@
       :currentOffsetY="modelOffsetY"
       :currentBubbleColor="bubbleColor"
       :currentEyeTracking="eyeTrackingEnabled"
+      :currentSystemPrompt="systemPrompt"
+      :currentGirlfriendName="girlfriendName"
       @close="showSettings = false"
       @cancel="handleCancelSettings"
       @save="handleSaveSettings"
@@ -164,6 +166,8 @@ const bubbleText = ref('');
 const isProcessing = ref(false);
 const isStreaming = ref(false);
 const bubbleColor = ref('#8b5cf6');
+const systemPrompt = ref('');
+const girlfriendName = ref('');
 
 const showThinking = ref(false);
 const thinkingPosition = ref({ x: 250, y: 350 });
@@ -240,13 +244,8 @@ const handleMouseUp = () => {
   isDraggingWindow.value = false;
 };
 
-const handleDoubleClick = (e: MouseEvent) => {
-  const containerHeight = containerRef.value?.clientHeight || 800;
-  const bottomArea = containerHeight * 0.7;
-  
-  if (e.clientY > bottomArea) {
-    showChatInput.value = true;
-  }
+const handleDoubleClick = () => {
+  showChatInput.value = true;
 };
 
 const handleSendMessage = async (message: string) => {
@@ -266,14 +265,22 @@ const handleSendMessage = async (message: string) => {
   isStreaming.value = true;
   bubbleText.value = '';
   
+  const modelName = currentModel.value?.name || undefined;
+  
   try {
-    await sendMessageStream(message, (token) => {
-      if (showThinking.value) {
-        showThinking.value = false;
-        showBubble.value = true;
-      }
-      bubbleText.value += token;
-    });
+    await sendMessageStream(
+      message, 
+      (token) => {
+        if (showThinking.value) {
+          showThinking.value = false;
+          showBubble.value = true;
+        }
+        bubbleText.value += token;
+      }, 
+      systemPrompt.value || undefined,
+      girlfriendName.value || undefined,
+      modelName
+    );
   } finally {
     isProcessing.value = false;
     isStreaming.value = false;
@@ -392,6 +399,8 @@ const handleSaveSettings = async (settings: {
   offsetY: number;
   bubbleColor: string;
   eyeTracking: boolean;
+  systemPrompt: string;
+  girlfriendName: string;
 }) => {
   let normalizedPath = settings.path;
   if (!normalizedPath.endsWith('/') && !normalizedPath.endsWith('\\')) {
@@ -403,6 +412,8 @@ const handleSaveSettings = async (settings: {
   modelOffsetX.value = settings.offsetX;
   modelOffsetY.value = settings.offsetY;
   bubbleColor.value = settings.bubbleColor;
+  systemPrompt.value = settings.systemPrompt;
+  girlfriendName.value = settings.girlfriendName;
   
   if (settings.eyeTracking !== eyeTrackingEnabled.value) {
     eyeTrackingEnabled.value = settings.eyeTracking;
@@ -423,7 +434,9 @@ const handleSaveSettings = async (settings: {
       modelOffsetX: settings.offsetX,
       modelOffsetY: settings.offsetY,
       bubbleColor: settings.bubbleColor,
-      eyeTracking: settings.eyeTracking
+      eyeTracking: settings.eyeTracking,
+      systemPrompt: settings.systemPrompt,
+      girlfriendName: settings.girlfriendName
     }).then(() => {
       saveToastText.value = '保存成功';
       showSaveToast.value = true;
@@ -476,6 +489,12 @@ const loadConfig = async () => {
     }
     if (config.bubbleColor !== undefined) {
       bubbleColor.value = config.bubbleColor;
+    }
+    if (config.systemPrompt !== undefined) {
+      systemPrompt.value = config.systemPrompt;
+    }
+    if (config.girlfriendName !== undefined) {
+      girlfriendName.value = config.girlfriendName;
     }
     if (config.eyeTracking !== undefined) {
       eyeTrackingEnabled.value = config.eyeTracking;
