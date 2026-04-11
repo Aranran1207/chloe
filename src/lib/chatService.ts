@@ -3,43 +3,338 @@ export interface ChatMessage {
   content: string;
 }
 
-const mockResponses = [
-  "你好呀！今天想聊什么呢？",
-  "嗯...让我想想该怎么回答你~",
-  "这个话题很有趣呢！",
-  "我明白了，继续说吧~",
-  "哇，真的吗？太棒了！",
-  "让我思考一下...",
-  "你说得对呢！",
-  "这个问题有点难，不过我会努力的！",
-  "嘿嘿，谢谢你的关心~",
-  "今天天气真不错呢！",
-];
+const OLLAMA_API_URL = 'http://localhost:11434';
+const OLLAMA_MODEL = 'qwen3.5:9b';
+
+const SYSTEM_PROMPT = '你是Chloe，一个可爱的Live2D桌面宠物。请用简短、可爱、友好的语气回复';
 
 export async function sendMessage(message: string): Promise<string> {
-  await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
-  
-  const randomIndex = Math.floor(Math.random() * mockResponses.length);
-  let response = mockResponses[randomIndex];
-  
-  if (message.includes('名字') || message.includes('叫什么')) {
-    response = "我叫Chloe，很高兴认识你！";
-  } else if (message.includes('你好') || message.includes('嗨') || message.includes('hi')) {
-    response = "你好呀！今天过得怎么样？";
-  } else if (message.includes('喜欢')) {
-    response = "我喜欢的事情有很多呢，比如和你聊天~";
-  } else if (message.includes('再见') || message.includes('拜拜')) {
-    response = "再见啦！下次再聊哦~";
-  } else if (message.includes('?') || message.includes('？')) {
-    response = "这是个好问题！让我想想...";
+  const startTime = performance.now();
+  console.log('[Ollama] 发送请求:', {
+    model: OLLAMA_MODEL,
+    message: message,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: SYSTEM_PROMPT
+          },
+          {
+            role: 'user',
+            content: message
+          }
+        ],
+        stream: false,
+        think: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const endTime = performance.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    
+    console.log('[Ollama] 响应成功:', {
+      content: data.message?.content,
+      duration: `${duration}s`
+    });
+
+    return data.message?.content || '抱歉，我没听懂呢~';
+  } catch (error) {
+    const endTime = performance.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.error('[Ollama] 调用失败:', {
+      error: error,
+      duration: `${duration}s`
+    });
+    return '哎呀，连接出现问题了，请检查Ollama是否正在运行~';
   }
-  
-  return response;
+}
+
+export async function sendMessageStream(
+  message: string,
+  onToken: (token: string) => void
+): Promise<string> {
+  const startTime = performance.now();
+  console.log('[Ollama] 发送流式请求:', {
+    model: OLLAMA_MODEL,
+    message: message,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: SYSTEM_PROMPT
+          },
+          {
+            role: 'user',
+            content: message
+          }
+        ],
+        stream: true,
+        think: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法获取响应流');
+    }
+
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let firstTokenTime: number | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) {
+        break;
+      }
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n').filter(line => line.trim());
+
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line);
+          console.log('[Ollama] 流式数据:', data);
+          
+          if (data.message?.content) {
+            if (!firstTokenTime) {
+              firstTokenTime = performance.now();
+              const ttfb = ((firstTokenTime - startTime) / 1000).toFixed(2);
+              console.log('[Ollama] 首个Token延迟:', `${ttfb}s`);
+            }
+            
+            const token = data.message.content;
+            fullContent += token;
+            onToken(token);
+          }
+          
+          if (data.done) {
+            const endTime = performance.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+            console.log('[Ollama] 流式响应完成:', {
+              content: fullContent,
+              duration: `${duration}s`,
+              tokensPerSecond: (fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)
+            });
+          }
+        } catch (e) {
+          console.warn('[Ollama] 解析行失败:', line);
+        }
+      }
+    }
+
+    return fullContent || '抱歉，我没听懂呢~';
+  } catch (error) {
+    const endTime = performance.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.error('[Ollama] 流式调用失败:', {
+      error: error,
+      duration: `${duration}s`
+    });
+    return '哎呀，连接出现问题了，请检查Ollama是否正在运行~';
+  }
 }
 
 export async function sendMessageWithHistory(
   message: string,
-  _history: ChatMessage[]
+  history: ChatMessage[]
 ): Promise<string> {
-  return sendMessage(message);
+  const startTime = performance.now();
+  console.log('[Ollama] 发送请求(带历史):', {
+    model: OLLAMA_MODEL,
+    message: message,
+    historyLength: history.length,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    const messages = [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT
+      },
+      ...history.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })),
+      {
+        role: 'user',
+        content: message
+      }
+    ];
+
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: messages,
+        stream: false,
+        think: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const endTime = performance.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    
+    console.log('[Ollama] 响应成功(带历史):', {
+      content: data.message?.content,
+      duration: `${duration}s`
+    });
+
+    return data.message?.content || '抱歉，我没听懂呢~';
+  } catch (error) {
+    const endTime = performance.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.error('[Ollama] 调用失败(带历史):', {
+      error: error,
+      duration: `${duration}s`
+    });
+    return '哎呀，连接出现问题了，请检查Ollama是否正在运行~';
+  }
+}
+
+export async function sendMessageWithHistoryStream(
+  message: string,
+  history: ChatMessage[],
+  onToken: (token: string) => void
+): Promise<string> {
+  const startTime = performance.now();
+  console.log('[Ollama] 发送流式请求(带历史):', {
+    model: OLLAMA_MODEL,
+    message: message,
+    historyLength: history.length,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    const messages = [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT
+      },
+      ...history.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })),
+      {
+        role: 'user',
+        content: message
+      }
+    ];
+
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: messages,
+        stream: true,
+        think: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法获取响应流');
+    }
+
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let firstTokenTime: number | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) {
+        break;
+      }
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n').filter(line => line.trim());
+
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line);
+          
+          if (data.message?.content) {
+            if (!firstTokenTime) {
+              firstTokenTime = performance.now();
+              const ttfb = ((firstTokenTime - startTime) / 1000).toFixed(2);
+              console.log('[Ollama] 首个Token延迟:', `${ttfb}s`);
+            }
+            
+            const token = data.message.content;
+            fullContent += token;
+            onToken(token);
+          }
+          
+          if (data.done) {
+            const endTime = performance.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+            console.log('[Ollama] 流式响应完成(带历史):', {
+              content: fullContent,
+              duration: `${duration}s`,
+              tokensPerSecond: (fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)
+            });
+          }
+        } catch (e) {
+          console.warn('[Ollama] 解析行失败:', line);
+        }
+      }
+    }
+
+    return fullContent || '抱歉，我没听懂呢~';
+  } catch (error) {
+    const endTime = performance.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.error('[Ollama] 流式调用失败(带历史):', {
+      error: error,
+      duration: `${duration}s`
+    });
+    return '哎呀，连接出现问题了，请检查Ollama是否正在运行~';
+  }
 }

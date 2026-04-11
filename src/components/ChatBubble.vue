@@ -1,35 +1,31 @@
 <template>
-  <Transition name="bubble-pop" @after-leave="onAfterLeave">
-    <div v-if="visible" class="chat-bubble" :style="bubbleStyle">
-      <div class="bubble-glow" :style="glowStyle"></div>
-      <div class="bubble-content" :style="contentStyle">
-        <div class="bubble-inner">
-          <span class="bubble-text">{{ displayText }}</span>
-          <div v-if="isTyping" class="typing-indicator">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
+  <Transition name="chat-bubble-pop" @after-leave="onAfterLeave">
+    <div v-if="visible" class="chat-bubble-container" :style="containerStyle">
+      <div class="chat-bubble" ref="bubbleRef">
+        <div class="bubble-content" :style="contentStyle" ref="contentRef">
+          <div class="bubble-inner" ref="innerRef">
+            <span class="bubble-text">{{ displayText }}</span>
+            <div v-if="isTyping" class="typing-indicator">
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="bubble-tail">
-        <svg viewBox="0 0 20 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 12L0 0H20L10 12Z" :fill="tailColor"/>
-        </svg>
       </div>
     </div>
   </Transition>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue';
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
 
 const props = defineProps<{
   visible: boolean;
   text: string;
-  position: { x: number; y: number };
   bubbleColor?: string;
   bubbleOpacity?: number;
+  streamMode?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -38,8 +34,14 @@ const emit = defineEmits<{
 
 const displayText = ref('');
 const isTyping = ref(false);
+const bubbleRef = ref<HTMLDivElement>();
+const contentRef = ref<HTMLDivElement>();
+const innerRef = ref<HTMLDivElement>();
 let typingTimer: number | null = null;
 let disappearTimer: number | null = null;
+
+const MAX_HEIGHT = 200;
+const BOTTOM_OFFSET = 220;
 
 const color = computed(() => props.bubbleColor || '#8b5cf6');
 const opacity = computed(() => props.bubbleOpacity ?? 0.95);
@@ -58,22 +60,42 @@ const darkenColor = (hex: string, factor: number) => {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 };
 
-const bubbleStyle = computed(() => ({
-  left: `${props.position.x}px`,
-  top: `${props.position.y}px`,
-}));
-
-const glowStyle = computed(() => ({
-  background: `radial-gradient(ellipse at center, ${hexToRgba(color.value, 0.3)} 0%, transparent 70%)`,
+const containerStyle = computed(() => ({
+  bottom: `${BOTTOM_OFFSET}px`,
 }));
 
 const contentStyle = computed(() => ({
   background: `linear-gradient(135deg, ${hexToRgba(color.value, opacity.value)} 0%, ${hexToRgba(darkenColor(color.value, 0.9), opacity.value)} 50%, ${hexToRgba(darkenColor(color.value, 0.8), opacity.value)} 100%)`,
 }));
 
-const tailColor = computed(() => hexToRgba(darkenColor(color.value, 0.9), opacity.value));
+const checkAndScrollContent = () => {
+  nextTick(() => {
+    if (!contentRef.value || !innerRef.value) return;
+    
+    const contentHeight = innerRef.value.scrollHeight;
+    
+    if (contentHeight > MAX_HEIGHT) {
+      contentRef.value.style.height = `${MAX_HEIGHT}px`;
+      contentRef.value.style.overflow = 'hidden';
+      
+      const scrollAmount = contentHeight - MAX_HEIGHT;
+      innerRef.value.style.transform = `translateY(-${scrollAmount}px)`;
+    } else {
+      contentRef.value.style.height = 'auto';
+      contentRef.value.style.overflow = 'visible';
+      innerRef.value.style.transform = 'translateY(0)';
+    }
+  });
+};
 
 const startTyping = () => {
+  if (props.streamMode) {
+    displayText.value = props.text;
+    isTyping.value = false;
+    checkAndScrollContent();
+    return;
+  }
+  
   displayText.value = '';
   isTyping.value = true;
   
@@ -88,6 +110,7 @@ const startTyping = () => {
     if (index < text.length) {
       displayText.value += text[index];
       index++;
+      checkAndScrollContent();
     } else {
       if (typingTimer) {
         clearInterval(typingTimer);
@@ -125,12 +148,36 @@ watch(() => props.visible, (visible) => {
     }
     displayText.value = '';
     isTyping.value = false;
+    
+    if (contentRef.value) {
+      contentRef.value.style.height = 'auto';
+      contentRef.value.style.overflow = 'visible';
+    }
+    if (innerRef.value) {
+      innerRef.value.style.transform = 'translateY(0)';
+    }
   }
 });
 
 watch(() => props.text, (newText) => {
+  if (props.streamMode) {
+    displayText.value = newText;
+    checkAndScrollContent();
+    if (disappearTimer) {
+      clearTimeout(disappearTimer);
+      disappearTimer = null;
+    }
+    return;
+  }
+  
   if (props.visible && newText) {
     startTyping();
+  }
+});
+
+watch(() => props.streamMode, (newMode, oldMode) => {
+  if (oldMode === true && newMode === false && props.visible) {
+    startDisappearTimer();
   }
 });
 
@@ -150,40 +197,28 @@ const onAfterLeave = () => {
 </script>
 
 <style scoped>
-.chat-bubble {
+.chat-bubble-container {
   position: absolute;
-  transform: translateX(-50%);
-  z-index: 2000;
+  left: 0;
+  right: 0;
+  z-index: 2500;
   pointer-events: none;
+  display: flex;
+  justify-content: center;
 }
 
-.bubble-glow {
-  position: absolute;
-  top: -20px;
-  left: -20px;
-  right: -20px;
-  bottom: -20px;
-  border-radius: 30px;
-  animation: glowPulse 2s ease-in-out infinite;
-  z-index: -1;
-}
-
-@keyframes glowPulse {
-  0%, 100% {
-    opacity: 0.6;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
+.chat-bubble {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .bubble-content {
   border: 2px solid rgba(255, 255, 255, 0.25);
   border-radius: 20px;
   padding: 14px 18px;
-  max-width: 280px;
+  max-width: 320px;
   min-width: 80px;
   box-shadow: 
     0 8px 32px rgba(0, 0, 0, 0.3),
@@ -192,7 +227,7 @@ const onAfterLeave = () => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   position: relative;
-  overflow: hidden;
+  transition: height 0.1s ease-out;
 }
 
 .bubble-content::before {
@@ -209,8 +244,9 @@ const onAfterLeave = () => {
 
 .bubble-inner {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  transition: transform 0.15s ease-out;
 }
 
 .bubble-text {
@@ -228,6 +264,7 @@ const onAfterLeave = () => {
   align-items: center;
   gap: 3px;
   margin-left: 4px;
+  flex-shrink: 0;
 }
 
 .typing-indicator .dot {
@@ -261,50 +298,33 @@ const onAfterLeave = () => {
   }
 }
 
-.bubble-tail {
-  position: absolute;
-  bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 24px;
-  height: 12px;
+.chat-bubble-pop-enter-active {
+  animation: bubbleFloatUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.bubble-tail svg {
-  width: 100%;
-  height: 100%;
+.chat-bubble-pop-leave-active {
+  animation: bubbleFadeOut 0.4s ease-in forwards;
 }
 
-.bubble-pop-enter-active {
-  animation: bubbleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.bubble-pop-leave-active {
-  animation: bubbleOut 0.4s ease-in forwards;
-}
-
-@keyframes bubbleIn {
+@keyframes bubbleFloatUp {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(20px) scale(0.6);
-  }
-  50% {
-    transform: translateX(-50%) translateY(-5px) scale(1.05);
+    transform: translateY(30px) scale(0.8);
   }
   100% {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
-@keyframes bubbleOut {
+@keyframes bubbleFadeOut {
   0% {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
+    transform: translateY(0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-15px) scale(0.9);
+    transform: translateY(-20px) scale(0.9);
   }
 }
 </style>

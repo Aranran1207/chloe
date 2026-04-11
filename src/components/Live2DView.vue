@@ -12,12 +12,17 @@
     
     <LoadingSpinner :visible="isLoading" :text="loadingText" />
 
+    <ThinkingBubble 
+      :visible="showThinking"
+      :position="thinkingPosition"
+    />
+
     <ChatBubble 
       :visible="showBubble"
       :text="bubbleText"
-      :position="bubblePosition"
       :bubbleColor="bubbleColor"
       :bubbleOpacity="bubbleOpacity"
+      :streamMode="isStreaming"
       @disappear="showBubble = false"
     />
 
@@ -112,11 +117,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { ChloeLive2D } from '../lib/chloe';
-import { sendMessage } from '../lib/chatService';
+import { sendMessageStream } from '../lib/chatService';
 import SettingsPanel from './SettingsPanel.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import ChatBubble from './ChatBubble.vue';
 import ChatInput from './ChatInput.vue';
+import ThinkingBubble from './ThinkingBubble.vue';
 
 interface ModelInfo {
   name: string;
@@ -158,10 +164,13 @@ const isDraggingWindow = ref(false);
 const showChatInput = ref(false);
 const showBubble = ref(false);
 const bubbleText = ref('');
-const bubblePosition = ref({ x: 250, y: 150 });
 const isProcessing = ref(false);
+const isStreaming = ref(false);
 const bubbleColor = ref('#8b5cf6');
 const bubbleOpacity = ref(0.95);
+
+const showThinking = ref(false);
+const thinkingPosition = ref({ x: 250, y: 350 });
 
 // 修复：Canvas 尺寸绑定到容器（不是document），避免窗口变大
 const resizeCanvas = () => {
@@ -250,19 +259,29 @@ const handleSendMessage = async (message: string) => {
   if (isProcessing.value) return;
   isProcessing.value = true;
   
+  const containerWidth = containerRef.value?.clientWidth || 500;
+  thinkingPosition.value = {
+    x: containerWidth / 2,
+    y: 350
+  };
+  
+  showThinking.value = true;
+  
+  isStreaming.value = true;
+  bubbleText.value = '';
+  
   try {
-    const response = await sendMessage(message);
-    bubbleText.value = response;
-    
-    const containerWidth = containerRef.value?.clientWidth || 500;
-    bubblePosition.value = {
-      x: containerWidth / 2,
-      y: 120
-    };
-    
-    showBubble.value = true;
+    await sendMessageStream(message, (token) => {
+      if (showThinking.value) {
+        showThinking.value = false;
+        showBubble.value = true;
+      }
+      bubbleText.value += token;
+    });
   } finally {
     isProcessing.value = false;
+    isStreaming.value = false;
+    showThinking.value = false;
   }
 };
 
@@ -358,7 +377,7 @@ const switchModel = async (model: ModelInfo) => {
   if (chloe.initialize(canvasRef.value!)) {
     let basePath = modelBasePath.value;
     if (!basePath.endsWith('/') && !basePath.endsWith('\\')) {
-      basePath += '/';
+      basePath += '\\';
     }
     const modelPath = basePath + model.path;
     chloe.loadModel(modelPath, model.file);
