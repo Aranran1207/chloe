@@ -1,11 +1,13 @@
 <template>
   <div ref="containerRef" class="live2d-container" 
+       :class="{ 'is-dragging': isDraggingWindow }"
        @mousedown="handleMouseDown" 
        @mousemove="handleMouseMove"
        @mouseup="handleMouseUp" 
        @mouseleave="handleMouseUp" 
        @contextmenu.prevent="showContextMenu">
     <canvas ref="canvasRef" class="live2d-canvas"></canvas>
+    <div v-if="isDraggingWindow" class="drag-border"></div>
     
     <LoadingSpinner :visible="isLoading" :text="loadingText" />
 
@@ -116,6 +118,7 @@ let startY = 0;
 let winStartX = 0;
 let winStartY = 0;
 const DRAG_THRESHOLD = 5;
+const isDraggingWindow = ref(false);
 
 // 修复：Canvas 尺寸绑定到容器（不是document），避免窗口变大
 const resizeCanvas = () => {
@@ -171,6 +174,7 @@ const handleMouseMove = (e: MouseEvent) => {
 
   if (!isDragging && (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD)) {
     isDragging = true;
+    isDraggingWindow.value = true;
   }
 
   if (isDragging && window.electronAPI) {
@@ -185,6 +189,7 @@ const handleMouseMove = (e: MouseEvent) => {
 const handleMouseUp = () => {
   isMouseDown = false;
   isDragging = false;
+  isDraggingWindow.value = false;
 };
 
 const showContextMenu = (e: MouseEvent) => {
@@ -602,5 +607,46 @@ onUnmounted(() => {
 .menu-fade-leave-to {
   opacity: 0;
   transform: scale(0.95) translateY(-5px);
+}
+
+.drag-border {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 3px solid transparent;
+  border-radius: 0;
+  pointer-events: none;
+  z-index: 9999;
+  animation: borderGlow 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes borderGlow {
+  0% {
+    border-color: rgba(102, 126, 234, 0.8);
+    box-shadow: 
+      0 0 10px rgba(102, 126, 234, 0.5),
+      0 0 20px rgba(102, 126, 234, 0.3),
+      inset 0 0 10px rgba(102, 126, 234, 0.2);
+  }
+  50% {
+    border-color: rgba(118, 75, 162, 0.9);
+    box-shadow: 
+      0 0 15px rgba(118, 75, 162, 0.6),
+      0 0 30px rgba(118, 75, 162, 0.4),
+      inset 0 0 15px rgba(118, 75, 162, 0.3);
+  }
+  100% {
+    border-color: rgba(102, 126, 234, 0.8);
+    box-shadow: 
+      0 0 10px rgba(102, 126, 234, 0.5),
+      0 0 20px rgba(102, 126, 234, 0.3),
+      inset 0 0 10px rgba(102, 126, 234, 0.2);
+  }
+}
+
+.live2d-container.is-dragging {
+  cursor: grabbing;
 }
 </style>
