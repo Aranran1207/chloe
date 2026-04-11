@@ -7,5 +7,8 @@
   },
   "modelScale": 2,
   "modelOffsetX": 0,
-  "modelOffsetY": -0.3
+  "modelOffsetY": -0.3,
+  "bubbleColor": "#00fbff",
+  "bubbleOpacity": 0.6,
+  "eyeTracking": true
 }

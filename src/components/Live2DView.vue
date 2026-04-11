@@ -4,12 +4,22 @@
        @mousedown="handleMouseDown" 
        @mousemove="handleMouseMove"
        @mouseup="handleMouseUp" 
-       @mouseleave="handleMouseUp" 
+       @mouseleave="handleMouseUp"
+       @dblclick="handleDoubleClick"
        @contextmenu.prevent="showContextMenu">
     <canvas ref="canvasRef" class="live2d-canvas"></canvas>
     <div v-if="isDraggingWindow" class="drag-border"></div>
     
     <LoadingSpinner :visible="isLoading" :text="loadingText" />
+
+    <ChatBubble 
+      :visible="showBubble"
+      :text="bubbleText"
+      :position="bubblePosition"
+      :bubbleColor="bubbleColor"
+      :bubbleOpacity="bubbleOpacity"
+      @disappear="showBubble = false"
+    />
 
     <Transition name="menu-fade">
       <div v-if="showMenu" class="context-menu" :style="{ left: menuX + 'px', top: menuY + 'px' }">
@@ -71,19 +81,42 @@
       :currentScale="modelScale"
       :currentOffsetX="modelOffsetX"
       :currentOffsetY="modelOffsetY"
+      :currentBubbleColor="bubbleColor"
+      :currentBubbleOpacity="bubbleOpacity"
+      :currentEyeTracking="eyeTrackingEnabled"
       @close="showSettings = false"
       @cancel="handleCancelSettings"
       @save="handleSaveSettings"
       @updateTransform="handleUpdateTransform"
     />
+    
+    <ChatInput 
+      :visible="showChatInput"
+      :bubbleColor="bubbleColor"
+      :bubbleOpacity="bubbleOpacity"
+      @send="handleSendMessage"
+      @cancel="showChatInput = false"
+    />
+    
+    <Transition name="toast-fade">
+      <div v-if="showSaveToast" class="save-toast">
+        <svg class="toast-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>{{ saveToastText }}</span>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { ChloeLive2D } from '../lib/chloe';
+import { sendMessage } from '../lib/chatService';
 import SettingsPanel from './SettingsPanel.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
+import ChatBubble from './ChatBubble.vue';
+import ChatInput from './ChatInput.vue';
 
 interface ModelInfo {
   name: string;
@@ -96,7 +129,7 @@ const canvasRef = ref<HTMLCanvasElement>();
 const showMenu = ref(false);
 const menuX = ref(0);
 const menuY = ref(0);
-const eyeTrackingEnabled = ref(false);
+const eyeTrackingEnabled = ref(true);
 const showSettings = ref(false);
 const showModelMenu = ref(false);
 const modelMenuX = ref(0);
@@ -108,6 +141,8 @@ const isLoading = ref(true);
 const loadingText = ref('正在加载模型...');
 const modelScale = ref(1.0);
 const modelOffsetX = ref(0.0);
+const showSaveToast = ref(false);
+const saveToastText = ref('保存成功');
 const modelOffsetY = ref(-0.3);
 let chloe: typeof ChloeLive2D | null = null;
 let isMouseDown = false;
@@ -119,6 +154,14 @@ let winStartX = 0;
 let winStartY = 0;
 const DRAG_THRESHOLD = 5;
 const isDraggingWindow = ref(false);
+
+const showChatInput = ref(false);
+const showBubble = ref(false);
+const bubbleText = ref('');
+const bubblePosition = ref({ x: 250, y: 150 });
+const isProcessing = ref(false);
+const bubbleColor = ref('#8b5cf6');
+const bubbleOpacity = ref(0.95);
 
 // 修复：Canvas 尺寸绑定到容器（不是document），避免窗口变大
 const resizeCanvas = () => {
@@ -190,6 +233,37 @@ const handleMouseUp = () => {
   isMouseDown = false;
   isDragging = false;
   isDraggingWindow.value = false;
+};
+
+const handleDoubleClick = (e: MouseEvent) => {
+  const containerHeight = containerRef.value?.clientHeight || 800;
+  const bottomArea = containerHeight * 0.7;
+  
+  if (e.clientY > bottomArea) {
+    showChatInput.value = true;
+  }
+};
+
+const handleSendMessage = async (message: string) => {
+  showChatInput.value = false;
+  
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+  
+  try {
+    const response = await sendMessage(message);
+    bubbleText.value = response;
+    
+    const containerWidth = containerRef.value?.clientWidth || 500;
+    bubblePosition.value = {
+      x: containerWidth / 2,
+      y: 120
+    };
+    
+    showBubble.value = true;
+  } finally {
+    isProcessing.value = false;
+  }
 };
 
 const showContextMenu = (e: MouseEvent) => {
@@ -301,6 +375,9 @@ const handleSaveSettings = async (settings: {
   scale: number; 
   offsetX: number; 
   offsetY: number;
+  bubbleColor: string;
+  bubbleOpacity: number;
+  eyeTracking: boolean;
 }) => {
   let normalizedPath = settings.path;
   if (!normalizedPath.endsWith('/') && !normalizedPath.endsWith('\\')) {
@@ -311,21 +388,42 @@ const handleSaveSettings = async (settings: {
   modelScale.value = settings.scale;
   modelOffsetX.value = settings.offsetX;
   modelOffsetY.value = settings.offsetY;
+  bubbleColor.value = settings.bubbleColor;
+  bubbleOpacity.value = settings.bubbleOpacity;
+  
+  if (settings.eyeTracking !== eyeTrackingEnabled.value) {
+    eyeTrackingEnabled.value = settings.eyeTracking;
+    if (settings.eyeTracking) {
+      window.electronAPI.startGlobalMouseTracking();
+      window.electronAPI.onGlobalMouseMove((data: { x: number; y: number }) => {
+        handleGlobalMouseMove(data);
+      });
+    } else {
+      window.electronAPI.stopGlobalMouseTracking();
+    }
+  }
   
   if (window.electronAPI) {
-    await window.electronAPI.setConfig({ 
+    window.electronAPI.setConfig({ 
       modelPath: normalizedPath,
       modelScale: settings.scale,
       modelOffsetX: settings.offsetX,
-      modelOffsetY: settings.offsetY
+      modelOffsetY: settings.offsetY,
+      bubbleColor: settings.bubbleColor,
+      bubbleOpacity: settings.bubbleOpacity,
+      eyeTracking: settings.eyeTracking
+    }).then(() => {
+      saveToastText.value = '保存成功';
+      showSaveToast.value = true;
+      setTimeout(() => {
+        showSaveToast.value = false;
+      }, 2000);
     });
   }
   
   if (chloe) {
     chloe.setModelTransform(settings.scale, settings.offsetX, settings.offsetY);
   }
-  
-  modelList.value = await window.electronAPI.getModelList();
 };
 
 const handleUpdateTransform = (settings: { 
@@ -364,6 +462,15 @@ const loadConfig = async () => {
     if (config.modelOffsetY !== undefined) {
       modelOffsetY.value = config.modelOffsetY;
     }
+    if (config.bubbleColor !== undefined) {
+      bubbleColor.value = config.bubbleColor;
+    }
+    if (config.bubbleOpacity !== undefined) {
+      bubbleOpacity.value = config.bubbleOpacity;
+    }
+    if (config.eyeTracking !== undefined) {
+      eyeTrackingEnabled.value = config.eyeTracking;
+    }
     modelList.value = await window.electronAPI.getModelList();
     
     if (config.currentModel && modelList.value.length > 0) {
@@ -372,10 +479,17 @@ const loadConfig = async () => {
         currentModel.value = savedModel;
       }
     }
+    
+    if (eyeTrackingEnabled.value) {
+      window.electronAPI.startGlobalMouseTracking();
+      window.electronAPI.onGlobalMouseMove((data) => {
+        handleGlobalMouseMove(data);
+      });
+    }
   }
 };
 
-const toggleEyeTracking = () => {
+const toggleEyeTracking = async () => {
   showMenu.value = false;
   eyeTrackingEnabled.value = !eyeTrackingEnabled.value;
   
@@ -390,6 +504,16 @@ const toggleEyeTracking = () => {
     if (window.electronAPI) {
       window.electronAPI.stopGlobalMouseTracking();
     }
+  }
+  
+  if (window.electronAPI) {
+    window.electronAPI.setConfig({ eyeTracking: eyeTrackingEnabled.value }).then(() => {
+      saveToastText.value = eyeTrackingEnabled.value ? '已开启注视鼠标' : '已关闭注视鼠标';
+      showSaveToast.value = true;
+      setTimeout(() => {
+        showSaveToast.value = false;
+      }, 2000);
+    });
   }
 };
 
@@ -648,5 +772,42 @@ onUnmounted(() => {
 
 .live2d-container.is-dragging {
   cursor: grabbing;
+}
+
+.save-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(22, 163, 74, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 8px 32px rgba(34, 197, 94, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 9999;
+}
+
+.toast-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
 }
 </style>

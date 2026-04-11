@@ -86,6 +86,49 @@
             </div>
           </div>
           
+          <div class="setting-group">
+            <label>气泡颜色</label>
+            <div class="color-picker-container">
+              <input 
+                type="color" 
+                v-model="bubbleColor" 
+                class="color-picker"
+              />
+              <div class="color-preview" :style="{ background: bubbleColor }"></div>
+              <span class="color-value">{{ bubbleColor }}</span>
+            </div>
+          </div>
+          
+          <div class="setting-group">
+            <label>气泡透明度</label>
+            <div class="slider-container">
+              <input 
+                type="range" 
+                v-model.number="bubbleOpacity" 
+                min="0.3" 
+                max="1.0" 
+                step="0.05"
+                class="slider"
+                @mousedown.stop="startSliding"
+                @mouseup="stopSliding"
+                @touchstart.stop="startSliding"
+                @touchend="stopSliding"
+              />
+              <span class="slider-value">{{ (bubbleOpacity * 100).toFixed(0) }}%</span>
+            </div>
+          </div>
+          
+          <div class="setting-group">
+            <label>注视鼠标</label>
+            <div class="toggle-container">
+              <label class="toggle">
+                <input type="checkbox" v-model="eyeTracking" />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="toggle-label">{{ eyeTracking ? '开启' : '关闭' }}</span>
+            </div>
+          </div>
+          
           <div class="setting-actions">
             <button class="btn btn-primary" @click="saveSettings">保存设置</button>
             <button class="btn btn-secondary" @click="$emit('cancel')">取消</button>
@@ -105,6 +148,9 @@ const props = defineProps<{
   currentScale: number;
   currentOffsetX: number;
   currentOffsetY: number;
+  currentBubbleColor: string;
+  currentBubbleOpacity: number;
+  currentEyeTracking: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -115,6 +161,9 @@ const emit = defineEmits<{
     scale: number;
     offsetX: number;
     offsetY: number;
+    bubbleColor: string;
+    bubbleOpacity: number;
+    eyeTracking: boolean;
   }];
   updateTransform: [settings: {
     scale: number;
@@ -127,6 +176,9 @@ const modelPath = ref(props.currentPath);
 const modelScale = ref(props.currentScale);
 const modelOffsetX = ref(props.currentOffsetX);
 const modelOffsetY = ref(props.currentOffsetY);
+const bubbleColor = ref(props.currentBubbleColor);
+const bubbleOpacity = ref(props.currentBubbleOpacity);
+const eyeTracking = ref(props.currentEyeTracking);
 const isSliding = ref(false);
 
 watch(() => props.visible, (visible) => {
@@ -135,6 +187,9 @@ watch(() => props.visible, (visible) => {
     modelScale.value = props.currentScale;
     modelOffsetX.value = props.currentOffsetX;
     modelOffsetY.value = props.currentOffsetY;
+    bubbleColor.value = props.currentBubbleColor || '#8b5cf6';
+    bubbleOpacity.value = props.currentBubbleOpacity ?? 0.95;
+    eyeTracking.value = props.currentEyeTracking ?? true;
   }
 });
 
@@ -168,7 +223,10 @@ const saveSettings = () => {
     path: modelPath.value,
     scale: modelScale.value,
     offsetX: modelOffsetX.value,
-    offsetY: modelOffsetY.value
+    offsetY: modelOffsetY.value,
+    bubbleColor: bubbleColor.value,
+    bubbleOpacity: bubbleOpacity.value,
+    eyeTracking: eyeTracking.value
   });
   emit('close');
 };
@@ -382,6 +440,64 @@ const saveSettings = () => {
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
   font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: 0.3s;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.toggle input:checked + .toggle-slider {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: transparent;
+}
+
+.toggle input:checked + .toggle-slider:before {
+  transform: translateX(24px);
+}
+
+.toggle-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .setting-actions {

@@ -11,15 +11,15 @@ let config = {
   currentModel: null,
   modelScale: 1.0,
   modelOffsetX: 0.0,
-  modelOffsetY: 0.0
+  modelOffsetY: 0.0,
+  bubbleColor: '#8b5cf6',
+  bubbleOpacity: 0.95,
+  eyeTracking: true
 };
 
 function loadConfig() {
-  if (isDev) {
-    configPath = path.join(__dirname, '../config.json');
-  } else {
-    configPath = path.join(path.dirname(app.getPath('exe')), 'config.json');
-  }
+  configPath = path.join(__dirname, '../../chloe-config.json');
+  
   try {
     if (fs.existsSync(configPath)) {
       const data = fs.readFileSync(configPath, 'utf-8');
