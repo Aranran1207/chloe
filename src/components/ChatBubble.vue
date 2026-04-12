@@ -3,8 +3,9 @@
     <div v-if="visible" class="chat-bubble-container" :style="containerStyle">
       <div class="chat-bubble" ref="bubbleRef">
         <div class="bubble-content" :style="contentStyle" ref="contentRef">
-          <div class="bubble-inner" ref="innerRef">
-            <span class="bubble-text">{{ displayText }}</span>
+          <div class="fade-top" v-if="isOverflow"></div>
+          <div class="bubble-scroll" ref="scrollRef">
+            <span class="bubble-text" v-html="renderedText"></span>
             <div v-if="isTyping" class="typing-indicator">
               <span class="dot"></span>
               <span class="dot"></span>
@@ -33,13 +34,14 @@ const emit = defineEmits<{
 
 const displayText = ref('');
 const isTyping = ref(false);
+const isOverflow = ref(false);
 const bubbleRef = ref<HTMLDivElement>();
 const contentRef = ref<HTMLDivElement>();
-const innerRef = ref<HTMLDivElement>();
+const scrollRef = ref<HTMLDivElement>();
 let typingTimer: number | null = null;
 let disappearTimer: number | null = null;
 
-const MAX_HEIGHT = 200;
+const MAX_HEIGHT = 180;
 const BOTTOM_OFFSET = 220;
 
 const color = computed(() => props.bubbleColor || '#8b5cf6');
@@ -60,22 +62,37 @@ const contentStyle = computed(() => ({
   borderColor: hexToRgba(color.value, 0.3),
 }));
 
+const parseMarkdown = (text: string): string => {
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/~~(.+?)~~/g, '<del>$1</del>')
+    .replace(/\n/g, '<br>');
+  
+  return html;
+};
+
+const renderedText = computed(() => {
+  return parseMarkdown(displayText.value);
+});
+
 const checkAndScrollContent = () => {
   nextTick(() => {
-    if (!contentRef.value || !innerRef.value) return;
+    if (!contentRef.value || !scrollRef.value) return;
     
-    const contentHeight = innerRef.value.scrollHeight;
+    const contentHeight = scrollRef.value.scrollHeight;
     
     if (contentHeight > MAX_HEIGHT) {
+      isOverflow.value = true;
       contentRef.value.style.height = `${MAX_HEIGHT}px`;
-      contentRef.value.style.overflow = 'hidden';
-      
-      const scrollAmount = contentHeight - MAX_HEIGHT;
-      innerRef.value.style.transform = `translateY(-${scrollAmount}px)`;
+      scrollRef.value.scrollTop = scrollRef.value.scrollHeight;
     } else {
+      isOverflow.value = false;
       contentRef.value.style.height = 'auto';
-      contentRef.value.style.overflow = 'visible';
-      innerRef.value.style.transform = 'translateY(0)';
     }
   });
 };
@@ -119,7 +136,7 @@ const startDisappearTimer = () => {
     clearTimeout(disappearTimer);
   }
   
-  const readingTime = Math.max(3000, props.text.length * 100);
+  const readingTime = Math.max(5000, props.text.length * 80);
   
   disappearTimer = window.setTimeout(() => {
     emit('disappear');
@@ -140,13 +157,10 @@ watch(() => props.visible, (visible) => {
     }
     displayText.value = '';
     isTyping.value = false;
+    isOverflow.value = false;
     
     if (contentRef.value) {
       contentRef.value.style.height = 'auto';
-      contentRef.value.style.overflow = 'visible';
-    }
-    if (innerRef.value) {
-      innerRef.value.style.transform = 'translateY(0)';
     }
   }
 });
@@ -185,6 +199,7 @@ onUnmounted(() => {
 const onAfterLeave = () => {
   displayText.value = '';
   isTyping.value = false;
+  isOverflow.value = false;
 };
 </script>
 
@@ -209,21 +224,42 @@ const onAfterLeave = () => {
 .bubble-content {
   border: 1px solid;
   border-radius: 16px;
-  padding: 12px 16px;
   max-width: 320px;
   min-width: 80px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   position: relative;
-  transition: height 0.1s ease-out;
+  transition: height 0.15s ease-out;
+  overflow: hidden;
 }
 
-.bubble-inner {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  transition: transform 0.15s ease-out;
+.fade-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(to bottom, 
+    var(--fade-color, rgba(139, 92, 246, 0.15)) 0%, 
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 10;
+  border-radius: 16px 16px 0 0;
+}
+
+.bubble-scroll {
+  max-height: 180px;
+  padding: 14px 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.bubble-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .bubble-text {
@@ -236,12 +272,34 @@ const onAfterLeave = () => {
   letter-spacing: 0.3px;
 }
 
+.bubble-text :deep(strong) {
+  font-weight: 700;
+  color: #fff;
+}
+
+.bubble-text :deep(em) {
+  font-style: italic;
+}
+
+.bubble-text :deep(code) {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+}
+
+.bubble-text :deep(del) {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 .typing-indicator {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 3px;
   margin-left: 4px;
-  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .typing-indicator .dot {

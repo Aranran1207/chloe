@@ -245,7 +245,7 @@ const handleMouseUp = () => {
 };
 
 const handleDoubleClick = () => {
-  showChatInput.value = true;
+  showChatInput.value = !showChatInput.value;
 };
 
 const handleSendMessage = async (message: string) => {

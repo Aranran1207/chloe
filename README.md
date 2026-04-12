@@ -1,6 +1,6 @@
 # Chloe - Live2D Desktop Pet
 
-一个基于 Electron、Vue3 和 TypeScript 的 Live2D 桌面宠物应用。
+一个基于 Electron、Vue3 和 TypeScript 的 Live2D 桌面宠物应用，已接入本地 Ollama 大模型。
 
 ## 功能特性
 
@@ -13,19 +13,29 @@
 - **窗口拖动** - 可自由拖动窗口位置，拖动时显示炫酷边框效果
 - **注视鼠标** - 模型眼睛跟随鼠标移动（全局追踪）
 - **点击交互** - 点击模型头部触发表情，点击身体触发动作
-- **双击对话** - 双击窗口底部弹出输入框，与模型进行对话
+- **双击对话** - 双击窗口任意位置弹出/隐藏输入框，与模型进行对话
+
+### AI 对话系统
+- **Ollama 集成** - 已接入本地 Ollama API，支持流式响应
+- **思考气泡** - 发送消息时显示思考动画（表情符号循环切换）
+- **流式输出** - AI 回复实时显示，无需等待完整响应
+- **自定义角色** - 可自定义女友名字和角色设定（性格、说话风格等）
+- **智能命名** - 名字为空时自动使用模型名称
+- **聊天记录** - 控制台输出完整聊天记录和统计信息
 
 ### 气泡对话系统
-- **智能回复** - 模拟大模型对话（可扩展接入真实 API）
-- **打字机效果** - 气泡文字逐字显示
-- **自定义样式** - 可自定义气泡颜色
+- **毛玻璃效果** - 气泡采用毛玻璃背景，颜色追随用户自定义
+- **Markdown 渲染** - 支持 **粗体**、*斜体*、`代码`、~~删除线~~ 和换行
+- **滚动显示** - 内容过长时自动滚动，顶部旧内容渐变淡出
+- **向上飘入** - 气泡从底部向上飘入动画
+- **向上淡出** - 气泡消失时向上飘走并淡出
 - **自动消失** - 根据文字长度自动计算消失时间
 
 ### 设置面板
 - **模型路径** - 自定义模型文件夹路径
 - **缩放比例** - 调整模型大小（0.5x - 2.0x）
 - **位置偏移** - 调整模型水平和垂直位置
-- **气泡颜色** - 自定义气泡和发送按钮颜色
+- **气泡颜色** - 自定义气泡和发送按钮颜色（毛玻璃效果，15% 不透明度）
 - **女友名字** - 给女友起个名字
 - **角色设定** - 自定义角色的性格、说话风格等
 - **注视鼠标** - 开关鼠标追踪功能
@@ -49,6 +59,7 @@
 - **TypeScript** - 类型安全的 JavaScript
 - **Vite** - 构建工具
 - **Live2D Cubism SDK for Web** - Live2D 渲染引擎
+- **Ollama** - 本地大模型推理引擎
 
 ## 项目结构
 
@@ -67,12 +78,13 @@ chloe/
 │   │   ├── SettingsPanel.vue # 设置面板
 │   │   ├── ChatBubble.vue    # 对话气泡
 │   │   ├── ChatInput.vue     # 对话输入框
+│   │   ├── ThinkingBubble.vue # 思考气泡
 │   │   └── LoadingSpinner.vue # 加载动画
 │   ├── framework/       # Live2D Framework SDK
 │   ├── lib/             # 自定义封装库
 │   │   ├── chloe.ts          # Live2D 控制器
 │   │   ├── model.ts          # 模型管理
-│   │   ├── chatService.ts    # 对话服务
+│   │   ├── chatService.ts    # Ollama 对话服务
 │   │   └── ...
 │   ├── App.vue          # 根组件
 │   └── main.ts          # 入口文件
@@ -89,7 +101,20 @@ chloe/
 npm install
 ```
 
-### 2. 添加 Live2D 模型
+### 2. 安装并启动 Ollama
+
+```bash
+# 安装 Ollama（如果未安装）
+# 访问 https://ollama.ai 下载
+
+# 拉取模型
+ollama pull qwen3.5:9b
+
+# 启动 Ollama 服务（通常自动启动）
+ollama serve
+```
+
+### 3. 添加 Live2D 模型
 
 将你的 Live2D 模型文件放到 `public/resources/` 目录下：
 
@@ -105,13 +130,13 @@ public/resources/
     └── 模型名.physics3.json   # 物理配置（可选）
 ```
 
-### 3. 开发模式运行
+### 4. 开发模式运行
 
 ```bash
 npm run electron:dev
 ```
 
-### 4. 构建生产版本
+### 5. 构建生产版本
 
 ```bash
 npm run electron:build
@@ -139,6 +164,36 @@ npm run electron:build
 }
 ```
 
+## Ollama 配置
+
+### 支持的模型
+
+在 `src/lib/chatService.ts` 中修改模型配置：
+
+```typescript
+const OLLAMA_MODEL = 'qwen3.5:9b';  // 可改为其他模型
+```
+
+推荐模型：
+- `qwen3.5:9b` - 约 6-7 GB 显存，效果较好
+- `qwen2.5:7b` - 约 4-5 GB 显存，平衡选择
+- `qwen2.5:3b` - 约 2-3 GB 显存，低配置首选
+
+### 显存优化
+
+已配置以下参数优化显存使用：
+
+```typescript
+const OLLAMA_OPTIONS = {
+  num_ctx: 4096,      // 上下文长度
+  keep_alive: "1m"    // 对话结束后 1 分钟卸载模型
+};
+```
+
+### 禁用思考模式
+
+对于 qwen3.5 等支持思考模式的模型，已添加 `think: false` 参数禁用思考模式，大幅提升响应速度。
+
 ## 开发说明
 
 ### 仅开发前端（不启动 Electron）
@@ -155,19 +210,30 @@ npm run dev
 npm run build
 ```
 
-## 扩展对话功能
+### 调试对话
 
-对话服务位于 `src/lib/chatService.ts`，目前使用模拟回复。可以修改 `sendMessage` 函数接入真实的大模型 API：
+打开浏览器开发者工具（F12），在 Console 面板中可以看到：
+- 请求发送日志
+- 首个 Token 延迟
+- 完整聊天记录
+- 响应统计信息
+
+## 自定义对话服务
+
+对话服务位于 `src/lib/chatService.ts`，可以修改以下函数接入其他 API：
 
 ```typescript
-export async function sendMessage(message: string): Promise<string> {
-  // 替换为真实 API 调用
-  const response = await fetch('your-api-endpoint', {
-    method: 'POST',
-    body: JSON.stringify({ message })
-  });
-  return response.json();
-}
+// 修改默认 prompt
+const buildDefaultPrompt = (name: string, modelName?: string): string => {
+  const displayName = name || modelName || 'Chloe';
+  return `你是${displayName}，我的女友。请用可爱的语气回复，称呼我为"亲爱的"。`;
+};
+
+// 修改 Ollama API 地址
+const OLLAMA_API_URL = 'http://localhost:11434';
+
+// 修改模型
+const OLLAMA_MODEL = 'qwen3.5:9b';
 ```
 
 ## 注意事项
@@ -176,6 +242,24 @@ export async function sendMessage(message: string): Promise<string> {
 2. **模型格式** - 支持 Live2D Cubism 3.0+ 格式的模型（.moc3）
 3. **资源路径** - 模型资源必须放在 `public/resources/` 目录下
 4. **窗口尺寸** - 默认 500x800，可在 `electron/main.js` 中修改
+5. **Ollama 服务** - 确保在使用前已启动 Ollama 服务
+6. **显存要求** - 9b 模型需要约 6-7 GB 显存，可根据显卡配置选择更小的模型
+
+## 更新日志
+
+### 2024-04-11
+- ✅ 接入本地 Ollama API，支持流式响应
+- ✅ 添加思考气泡组件，显示思考动画
+- ✅ 气泡改为从底部向上飘入，消失时向上淡出
+- ✅ 气泡采用毛玻璃效果，颜色追随用户自定义
+- ✅ 添加女友名字设置，名字为空时使用模型名称
+- ✅ 添加角色设定（systemPrompt）自定义功能
+- ✅ 气泡支持 Markdown 渲染（粗体、斜体、代码、删除线）
+- ✅ 气泡内容过长时自动滚动，顶部渐变淡出
+- ✅ 双击窗口任意位置切换输入框显示/隐藏
+- ✅ 优化 Ollama 显存使用（减小上下文、设置 keep_alive）
+- ✅ 禁用 qwen3.5 思考模式，大幅提升响应速度
+- ✅ 控制台输出完整聊天记录和统计信息
 
 ## 许可证
 

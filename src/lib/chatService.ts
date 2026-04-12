@@ -11,6 +11,11 @@ const buildDefaultPrompt = (name: string, modelName?: string): string => {
   return `你是${displayName}，我的女友。请用可爱的语气回复，称呼我为"亲爱的"。`;
 };
 
+const OLLAMA_OPTIONS = {
+  num_ctx: 4096,
+  keep_alive: "1m"
+};
+
 export async function sendMessage(
   message: string, 
   systemPrompt?: string,
@@ -45,7 +50,8 @@ export async function sendMessage(
           }
         ],
         stream: false,
-        think: false
+        think: false,
+        options: OLLAMA_OPTIONS
       })
     });
 
@@ -109,7 +115,8 @@ export async function sendMessageStream(
           }
         ],
         stream: true,
-        think: false
+        think: false,
+        options: OLLAMA_OPTIONS
       })
     });
 
@@ -156,11 +163,16 @@ export async function sendMessageStream(
           if (data.done) {
             const endTime = performance.now();
             const duration = ((endTime - startTime) / 1000).toFixed(2);
-            console.log('[Ollama] 流式响应完成:', {
-              content: fullContent,
-              duration: `${duration}s`,
-              tokensPerSecond: (fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)
-            });
+            
+            console.log('\n========================================');
+            console.log('[聊天记录]');
+            console.log('========================================');
+            console.log(`[用户] ${message}`);
+            console.log('----------------------------------------');
+            console.log(`[AI] ${fullContent}`);
+            console.log('========================================');
+            console.log(`[统计] 耗时: ${duration}s | 速度: ${(fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)} 字符/秒`);
+            console.log('========================================\n');
           }
         } catch (e) {
           console.warn('[Ollama] 解析行失败:', line);
@@ -222,7 +234,8 @@ export async function sendMessageWithHistory(
         model: OLLAMA_MODEL,
         messages: messages,
         stream: false,
-        think: false
+        think: false,
+        options: OLLAMA_OPTIONS
       })
     });
 
@@ -294,7 +307,8 @@ export async function sendMessageWithHistoryStream(
         model: OLLAMA_MODEL,
         messages: messages,
         stream: true,
-        think: false
+        think: false,
+        options: OLLAMA_OPTIONS
       })
     });
 
@@ -340,11 +354,21 @@ export async function sendMessageWithHistoryStream(
           if (data.done) {
             const endTime = performance.now();
             const duration = ((endTime - startTime) / 1000).toFixed(2);
-            console.log('[Ollama] 流式响应完成(带历史):', {
-              content: fullContent,
-              duration: `${duration}s`,
-              tokensPerSecond: (fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)
+            
+            console.log('\n========================================');
+            console.log('[聊天记录 (带历史)]');
+            console.log('========================================');
+            history.forEach((msg, idx) => {
+              const role = msg.role === 'user' ? '用户' : 'AI';
+              console.log(`[${role}] ${msg.content}`);
+              console.log('----------------------------------------');
             });
+            console.log(`[用户] ${message}`);
+            console.log('----------------------------------------');
+            console.log(`[AI] ${fullContent}`);
+            console.log('========================================');
+            console.log(`[统计] 耗时: ${duration}s | 速度: ${(fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)} 字符/秒 | 历史轮数: ${history.length}`);
+            console.log('========================================\n');
           }
         } catch (e) {
           console.warn('[Ollama] 解析行失败:', line);
