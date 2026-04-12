@@ -3,12 +3,34 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface MotionTrigger {
+  name: string;
+  position: number;
+}
+
 const OLLAMA_API_URL = 'http://localhost:11434';
 const OLLAMA_MODEL = 'qwen3.5:9b';
 
-const buildDefaultPrompt = (name: string, modelName?: string): string => {
+const buildDefaultPrompt = (name: string, modelName?: string, availableMotions?: string): string => {
   const displayName = name || modelName || 'Chloe';
-  return `你是${displayName}，我的女友。请用可爱的语气回复，称呼我为"亲爱的"。`;
+  let prompt = `你是${displayName}，我的女友。请用可爱的语气回复，称呼我为"亲爱的"。`;
+  
+  if (availableMotions && availableMotions !== '当前模型没有可用动作') {
+    prompt += `\n\n【重要】你可以通过动作来表达情感，让回复更加生动有趣！`;
+    prompt += `\n\n${availableMotions}`;
+    prompt += `\n\n使用方法：在回复文字中插入 [动作:动作名] 来触发对应动作。`;
+    prompt += `\n\n示例：`;
+    prompt += `\n- 用户说"今天天气真好" → 你回复：[动作:开心] 是呢亲爱的！阳光明媚的~`;
+    prompt += `\n- 用户说"我有点累" → 你回复：[动作:瞌睡] 亲爱的辛苦了，快休息一下吧~`;
+    prompt += `\n- 用户说"你真可爱" → 你回复：[动作:眨眼] 嘿嘿，谢谢亲爱的夸奖~`;
+    prompt += `\n\n注意事项：`;
+    prompt += `\n1. 动作标记会在显示时自动移除，用户看不到 [动作:xxx]`;
+    prompt += `\n2. 根据对话情感选择合适的动作，不必每次都使用`;
+    prompt += `\n3. 一个回复可以使用多个动作，例如：[动作:开心][动作:摇头]`;
+    prompt += `\n4. 动作名可以是中文描述（如"开心"）或英文文件名（如"kaixin"）`;
+  }
+  
+  return prompt;
 };
 
 const OLLAMA_OPTIONS = {
@@ -16,14 +38,32 @@ const OLLAMA_OPTIONS = {
   keep_alive: "1m"
 };
 
+export function parseMotionTriggers(text: string): { cleanText: string; motions: MotionTrigger[] } {
+  const motionRegex = /\[动作:([^\]]+)\]/g;
+  const motions: MotionTrigger[] = [];
+  let match;
+  
+  while ((match = motionRegex.exec(text)) !== null) {
+    motions.push({
+      name: match[1].trim(),
+      position: match.index
+    });
+  }
+  
+  const cleanText = text.replace(motionRegex, '').trim();
+  
+  return { cleanText, motions };
+}
+
 export async function sendMessage(
   message: string, 
   systemPrompt?: string,
   girlfriendName?: string,
-  modelName?: string
+  modelName?: string,
+  availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
-  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName);
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions);
   
   console.log('[Ollama] 发送请求:', {
     model: OLLAMA_MODEL,
@@ -85,10 +125,11 @@ export async function sendMessageStream(
   onToken: (token: string) => void,
   systemPrompt?: string,
   girlfriendName?: string,
-  modelName?: string
+  modelName?: string,
+  availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
-  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName);
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions);
   
   console.log('[Ollama] 发送流式请求:', {
     model: OLLAMA_MODEL,
@@ -146,13 +187,10 @@ export async function sendMessageStream(
       for (const line of lines) {
         try {
           const data = JSON.parse(line);
-          console.log('[Ollama] 流式数据:', data);
           
           if (data.message?.content) {
             if (!firstTokenTime) {
               firstTokenTime = performance.now();
-              const ttfb = ((firstTokenTime - startTime) / 1000).toFixed(2);
-              console.log('[Ollama] 首个Token延迟:', `${ttfb}s`);
             }
             
             const token = data.message.content;
@@ -175,7 +213,7 @@ export async function sendMessageStream(
             console.log('========================================\n');
           }
         } catch (e) {
-          console.warn('[Ollama] 解析行失败:', line);
+          // 静默处理解析错误
         }
       }
     }
@@ -197,10 +235,11 @@ export async function sendMessageWithHistory(
   history: ChatMessage[],
   systemPrompt?: string,
   girlfriendName?: string,
-  modelName?: string
+  modelName?: string,
+  availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
-  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName);
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions);
   
   console.log('[Ollama] 发送请求(带历史):', {
     model: OLLAMA_MODEL,
@@ -270,10 +309,11 @@ export async function sendMessageWithHistoryStream(
   onToken: (token: string) => void,
   systemPrompt?: string,
   girlfriendName?: string,
-  modelName?: string
+  modelName?: string,
+  availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
-  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName);
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions);
   
   console.log('[Ollama] 发送流式请求(带历史):', {
     model: OLLAMA_MODEL,
@@ -342,8 +382,6 @@ export async function sendMessageWithHistoryStream(
           if (data.message?.content) {
             if (!firstTokenTime) {
               firstTokenTime = performance.now();
-              const ttfb = ((firstTokenTime - startTime) / 1000).toFixed(2);
-              console.log('[Ollama] 首个Token延迟:', `${ttfb}s`);
             }
             
             const token = data.message.content;
@@ -371,7 +409,7 @@ export async function sendMessageWithHistoryStream(
             console.log('========================================\n');
           }
         } catch (e) {
-          console.warn('[Ollama] 解析行失败:', line);
+          // 静默处理解析错误
         }
       }
     }

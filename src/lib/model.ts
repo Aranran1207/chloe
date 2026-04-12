@@ -453,6 +453,10 @@ export class ChloeModel extends CubismUserModel {
     return false;
   }
 
+  public getModelSetting(): ICubismModelSetting {
+    return this._modelSetting;
+  }
+
   public draw(matrix: CubismMatrix44): void {
     if (this._model == null) return;
     if (this._state == LoadStep.CompleteSetup) {

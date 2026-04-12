@@ -116,7 +116,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { ChloeLive2D } from '../lib/chloe';
-import { sendMessageStream } from '../lib/chatService';
+import { sendMessageStream, parseMotionTriggers } from '../lib/chatService';
+import { MotionManager } from '../lib/motionManager';
 import SettingsPanel from './SettingsPanel.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import ChatBubble from './ChatBubble.vue';
@@ -171,6 +172,8 @@ const girlfriendName = ref('');
 
 const showThinking = ref(false);
 const thinkingPosition = ref({ x: 250, y: 350 });
+
+let motionManager: MotionManager | null = null;
 
 // 修复：Canvas 尺寸绑定到容器（不是document），避免窗口变大
 const resizeCanvas = () => {
@@ -266,6 +269,11 @@ const handleSendMessage = async (message: string) => {
   bubbleText.value = '';
   
   const modelName = currentModel.value?.name || undefined;
+  const availableMotions = motionManager?.getMotionListForAI();
+  
+  console.log('[Live2DView] 可用动作列表:', availableMotions);
+  
+  let fullResponse = '';
   
   try {
     await sendMessageStream(
@@ -275,12 +283,26 @@ const handleSendMessage = async (message: string) => {
           showThinking.value = false;
           showBubble.value = true;
         }
-        bubbleText.value += token;
+        fullResponse += token;
+        const { cleanText } = parseMotionTriggers(fullResponse);
+        bubbleText.value = cleanText;
       }, 
       systemPrompt.value || undefined,
       girlfriendName.value || undefined,
-      modelName
+      modelName,
+      availableMotions
     );
+    
+    const { cleanText, motions } = parseMotionTriggers(fullResponse);
+    bubbleText.value = cleanText;
+    
+    if (motions.length > 0 && motionManager) {
+      motions.forEach((motion, index) => {
+        setTimeout(() => {
+          motionManager?.playMotionByName(motion.name);
+        }, index * 500);
+      });
+    }
   } finally {
     isProcessing.value = false;
     isStreaming.value = false;
@@ -384,8 +406,16 @@ const switchModel = async (model: ModelInfo) => {
     }
     const modelPath = basePath + model.path;
     chloe.loadModel(modelPath, model.file);
-    chloe.start();
-  }
+      chloe.start();
+      
+      setTimeout(() => {
+        if (motionManager) {
+          motionManager.setChloe(chloe!);
+          console.log('[Live2DView] 动作管理器已更新');
+          console.log('[Live2DView] 可用动作:', motionManager.getAvailableMotions());
+        }
+      }, 1000);
+    }
   
   setTimeout(() => {
     isLoading.value = false;
@@ -603,6 +633,13 @@ onMounted(async () => {
       
       chloe.setModelTransform(modelScale.value, modelOffsetX.value, modelOffsetY.value);
       chloe.start();
+      
+      setTimeout(() => {
+        motionManager = MotionManager.getInstance();
+        motionManager.setChloe(chloe!);
+        console.log('[Live2DView] 动作管理器已初始化');
+        console.log('[Live2DView] 可用动作:', motionManager.getAvailableMotions());
+      }, 1000);
     }
 
     canvasRef.value.addEventListener('click', (e) => {
