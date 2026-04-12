@@ -152,42 +152,9 @@ export class MotionManager {
       return false;
     }
 
-    console.log(`[MotionManager] 播放动作: ${motion.description || motion.name}`);
-    
-    const handle = model.startMotion(
-      group, 
-      index, 
-      priority,
-      () => {
-        console.log(`[MotionManager] 动作完成，恢复待机状态`);
-        setTimeout(() => {
-          this.playIdleMotion();
-        }, 500);
-      }
-    );
+    model.startMotion(group, index, priority);
     
     return true;
-  }
-
-  private playIdleMotion(): boolean {
-    if (!this._chloe) return false;
-    
-    const model = this._chloe.getModel();
-    if (!model) return false;
-
-    const idleMotions = this._currentMotions.filter(m => 
-      m.group.toLowerCase() === 'idle' || 
-      m.name.toLowerCase().includes('idle')
-    );
-
-    if (idleMotions.length > 0) {
-      const randomIdle = idleMotions[Math.floor(Math.random() * idleMotions.length)];
-      console.log(`[MotionManager] 播放待机动作: ${randomIdle.description || randomIdle.name}`);
-      model.startMotion(randomIdle.group, randomIdle.index, 1);
-      return true;
-    }
-
-    return false;
   }
 
   public playRandomMotion(group?: string, priority: number = 2): boolean {
@@ -213,17 +180,7 @@ export class MotionManager {
     const randomMotion = motions[Math.floor(Math.random() * motions.length)];
     console.log(`[MotionManager] 随机播放动作: ${randomMotion.description || randomMotion.name}`);
     
-    model.startMotion(
-      randomMotion.group, 
-      randomMotion.index, 
-      priority,
-      () => {
-        console.log(`[MotionManager] 动作完成，恢复待机状态`);
-        setTimeout(() => {
-          this.playIdleMotion();
-        }, 500);
-      }
-    );
+    model.startMotion(randomMotion.group, randomMotion.index, priority);
     return true;
   }
 

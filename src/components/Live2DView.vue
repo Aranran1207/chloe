@@ -300,7 +300,7 @@ const handleSendMessage = async (message: string) => {
       motions.forEach((motion, index) => {
         setTimeout(() => {
           motionManager?.playMotionByName(motion.name);
-        }, index * 500);
+        }, index * 800);
       });
     }
   } finally {

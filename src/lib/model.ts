@@ -336,8 +336,17 @@ export class ChloeModel extends CubismUserModel {
 
     let motionUpdated = false;
     this._model.loadParameters();
+    
     if (this._motionManager.isFinished()) {
-      this.startRandomMotion('Idle', 1);
+      const hasIdleMotion = this._modelSetting && 
+                            this._modelSetting.getMotionCount('Idle') > 0;
+      
+      if (hasIdleMotion) {
+        this.startRandomMotion('Idle', 1);
+        motionUpdated = this._motionManager.updateMotion(this._model, deltaTimeSeconds);
+      } else {
+        this.resetParametersToDefault();
+      }
     } else {
       motionUpdated = this._motionManager.updateMotion(this._model, deltaTimeSeconds);
     }
@@ -387,6 +396,7 @@ export class ChloeModel extends CubismUserModel {
     const motionFileName = this._modelSetting.getMotionFileName(group, no);
     const name = `${group}_${no}`;
     let motion: CubismMotion = this._motions.getValue(name) as CubismMotion;
+    let autoDelete = false;
 
     if (motion == null) {
       fetch(`${this._modelHomeDir}${motionFileName}`)
@@ -401,13 +411,24 @@ export class ChloeModel extends CubismUserModel {
             onFinishedMotionHandler, onBeganMotionHandler,
             this._modelSetting, group, no, this._motionConsistency
           );
+          
+          if (motion) {
+            motion.setEffectIds(this._eyeBlinkIds, this._lipSyncIds);
+            autoDelete = true;
+            this._motionManager.startMotionPriority(motion, autoDelete, priority);
+          } else {
+            CubismLogError(`Can't start motion ${motionFileName}.`);
+            this._motionManager.setReservePriority(0);
+          }
         });
+      
+      return InvalidMotionQueueEntryHandleValue;
     } else {
       motion.setBeganMotionHandler(onBeganMotionHandler);
       motion.setFinishedMotionHandler(onFinishedMotionHandler);
     }
 
-    return this._motionManager.startMotionPriority(motion, false, priority);
+    return this._motionManager.startMotionPriority(motion, autoDelete, priority);
   }
 
   public startRandomMotion(
@@ -455,6 +476,22 @@ export class ChloeModel extends CubismUserModel {
 
   public getModelSetting(): ICubismModelSetting {
     return this._modelSetting;
+  }
+
+  public stopAllMotions(): void {
+    if (this._motionManager) {
+      this._motionManager.stopAllMotions();
+    }
+  }
+
+  public resetParametersToDefault(): void {
+    if (this._model == null) return;
+    
+    const parameterCount = this._model.getParameterCount();
+    for (let i = 0; i < parameterCount; i++) {
+      const defaultValue = this._model.getParameterDefaultValue(i);
+      this._model.setParameterValueByIndex(i, defaultValue, 1.0);
+    }
   }
 
   public draw(matrix: CubismMatrix44): void {
