@@ -54,6 +54,14 @@
           <span>设置</span>
         </div>
         
+        <div class="menu-item" @click="openMemoryPanel">
+          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span>记忆管理</span>
+        </div>
+        
         <div class="menu-divider"></div>
         <div class="menu-item menu-item-danger" @click="quitApp">
           <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -95,6 +103,12 @@
       @updateTransform="handleUpdateTransform"
     />
     
+    <MemoryPanel 
+      :visible="showMemoryPanel"
+      @close="showMemoryPanel = false"
+      @cleared="handleMemoryCleared"
+    />
+    
     <ChatInput 
       :visible="showChatInput"
       :bubbleColor="bubbleColor"
@@ -118,7 +132,9 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { ChloeLive2D } from '../lib/chloe';
 import { sendMessageStream, parseMotionTriggers } from '../lib/chatService';
 import { MotionManager } from '../lib/motionManager';
+import { proactiveEngine } from '../lib/memory/proactiveEngine';
 import SettingsPanel from './SettingsPanel.vue';
+import MemoryPanel from './MemoryPanel.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import ChatBubble from './ChatBubble.vue';
 import ChatInput from './ChatInput.vue';
@@ -172,8 +188,35 @@ const girlfriendName = ref('');
 
 const showThinking = ref(false);
 const thinkingPosition = ref({ x: 250, y: 350 });
+const showMemoryPanel = ref(false);
 
 let motionManager: MotionManager | null = null;
+
+const handleProactiveQuestion = async (question: string) => {
+  if (isProcessing.value || showBubble.value) {
+    console.log('[Live2DView] 正在处理中，跳过主动提问');
+    return;
+  }
+  
+  console.log('[Live2DView] 收到主动提问:', question);
+  
+  const containerWidth = containerRef.value?.clientWidth || 500;
+  thinkingPosition.value = {
+    x: containerWidth / 2,
+    y: 350
+  };
+  
+  showThinking.value = true;
+  isStreaming.value = true;
+  bubbleText.value = question;
+  
+  setTimeout(() => {
+    showThinking.value = false;
+    showBubble.value = true;
+  }, 500);
+  
+  isStreaming.value = false;
+};
 
 // 修复：Canvas 尺寸绑定到容器（不是document），避免窗口变大
 const resizeCanvas = () => {
@@ -256,6 +299,8 @@ const handleSendMessage = async (message: string) => {
   
   if (isProcessing.value) return;
   isProcessing.value = true;
+  
+  proactiveEngine.resetSession();
   
   const containerWidth = containerRef.value?.clientWidth || 500;
   thinkingPosition.value = {
@@ -345,6 +390,11 @@ const quitApp = () => {
 const openSettings = () => {
   showMenu.value = false;
   showSettings.value = true;
+};
+
+const openMemoryPanel = () => {
+  showMenu.value = false;
+  showMemoryPanel.value = true;
 };
 
 const showModelSwitcher = async () => {
@@ -498,6 +548,14 @@ const handleCancelSettings = () => {
   }
 };
 
+const handleMemoryCleared = () => {
+  saveToastText.value = '记忆已清空';
+  showSaveToast.value = true;
+  setTimeout(() => {
+    showSaveToast.value = false;
+  }, 2000);
+};
+
 const loadConfig = async () => {
   if (window.electronAPI) {
     const config = await window.electronAPI.getConfig();
@@ -640,6 +698,10 @@ onMounted(async () => {
         console.log('[Live2DView] 动作管理器已初始化');
         console.log('[Live2DView] 可用动作:', motionManager.getAvailableMotions());
       }, 1000);
+      
+      proactiveEngine.setQuestionCallback(handleProactiveQuestion);
+      proactiveEngine.startProactiveMode(30);
+      console.log('[Live2DView] 主动提问引擎已启动');
     }
 
     canvasRef.value.addEventListener('click', (e) => {
@@ -657,6 +719,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  proactiveEngine.stopProactiveMode();
+  
   if (window.electronAPI) {
     window.electronAPI.stopGlobalMouseTracking();
   }
