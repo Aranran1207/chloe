@@ -14,5 +14,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   setConfig: (config) => ipcRenderer.invoke('set-config', config),
   openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),
-  getModelList: () => ipcRenderer.invoke('get-model-list')
+  getModelList: () => ipcRenderer.invoke('get-model-list'),
+  
+  // 记忆系统 API
+  memory: {
+    add: (memoryData) => ipcRenderer.invoke('memory-add', memoryData),
+    getAll: () => ipcRenderer.invoke('memory-get-all'),
+    getByCategory: (category) => ipcRenderer.invoke('memory-get-by-category', category),
+    update: (id, updates) => ipcRenderer.invoke('memory-update', id, updates),
+    delete: (id) => ipcRenderer.invoke('memory-delete', id),
+    clearAll: () => ipcRenderer.invoke('memory-clear-all'),
+    getStats: () => ipcRenderer.invoke('memory-get-stats'),
+    searchByEmbedding: (embedding, topK) => ipcRenderer.invoke('memory-search-by-embedding', embedding, topK)
+  }
 });

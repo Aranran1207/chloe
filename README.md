@@ -247,16 +247,140 @@ const OLLAMA_MODEL = 'qwen3.5:9b';
 5. **Ollama 服务** - 确保在使用前已启动 Ollama 服务
 6. **显存要求** - 9b 模型需要约 6-7 GB 显存，可根据显卡配置选择更小的模型
 
+## 后续开发计划 - AI 记忆系统
+
+### 📋 开发路线图
+
+#### Phase 1: 基础记忆存储 ✅ 已完成
+- [x] 安装 better-sqlite3 依赖
+- [x] 创建 `src/lib/memory/memoryTypes.ts` - 类型定义
+- [x] 创建 `src/lib/memory/embeddingService.ts` - 向量嵌入服务
+- [x] 创建 `src/lib/memory/memoryService.ts` - 记忆核心服务（SQLite）
+- [x] 创建 `src/lib/memory/memoryIntegrator.ts` - 记忆整合器
+- [x] 创建 `src/lib/memory/memoryClient.ts` - 前端记忆客户端
+- [x] 修改 `electron/main.js` - 添加记忆数据库 IPC
+- [x] 修改 `electron/preload.js` - 暴露记忆 API
+- [x] 修改 `src/lib/chatService.ts` - 集成记忆检索
+- [x] 测试：记忆存储、检索、相似度搜索
+
+#### Phase 2: 智能记忆提取 ✅ 已完成
+- [x] 创建 `src/lib/memory/memoryExtractor.ts` - AI 记忆提取器
+- [x] 实现对话后自动提取记忆
+- [x] 实现记忆去重和合并（向量相似度 + 文本相似度）
+- [x] 实现记忆重要性评估
+- [x] 添加清空记忆功能到设置面板
+- [x] 测试：自动提取准确性 ✅ 向量相似度 1.000
+
+#### Phase 3: 主动提问引擎 🟢 待开始
+- [ ] 创建 `src/lib/memory/proactiveEngine.ts` - 主动提问引擎
+- [ ] 实现记忆缺口分析
+- [ ] 实现智能问题生成
+- [ ] 添加定时触发机制
+- [ ] 测试：主动提问自然度
+
+#### Phase 4: 记忆管理界面 🟢 待开始
+- [ ] 创建 `src/components/MemoryPanel.vue` - 记忆管理面板
+- [ ] 实现记忆列表展示
+- [ ] 实现记忆编辑/删除
+- [ ] 实现记忆分类筛选
+- [ ] 添加记忆统计可视化
+
+### 📁 需要创建的文件
+
+```
+src/lib/memory/
+├── memoryTypes.ts        # 类型定义（Memory, MemoryCategory 等）
+├── embeddingService.ts   # 向量嵌入服务（调用 nomic-embed-text）
+├── memoryService.ts      # 核心服务（SQLite CRUD + 向量搜索）
+├── memoryExtractor.ts    # AI 记忆提取器
+├── memoryIntegrator.ts   # 记忆整合到 Prompt
+└── proactiveEngine.ts    # 主动提问引擎
+
+数据存储：
+../chloe-memory.db        # SQLite 数据库文件
+```
+
+### 🔧 需要修改的文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `package.json` | 添加 better-sqlite3 依赖 |
+| `src/lib/chatService.ts` | 集成记忆检索和提取 |
+| `src/components/Live2DView.vue` | 添加主动提问触发 |
+| `electron/main.js` | 添加记忆数据库 IPC 处理 |
+| `electron/preload.js` | 暴露记忆相关 API |
+
+### 🧠 记忆系统架构
+
+```
+用户对话 → ChatService → AI 回复
+    │                        │
+    ▼                        ▼
+MemoryExtractor        MemoryIntegrator
+    │                        ▲
+    ▼                        │
+MemoryService (SQLite + 向量索引)
+    │
+    ▼
+EmbeddingService (nomic-embed-text)
+```
+
+### 📊 SQLite 数据库结构
+
+```sql
+CREATE TABLE memories (
+  id TEXT PRIMARY KEY,
+  content TEXT NOT NULL,
+  category TEXT NOT NULL,
+  importance INTEGER DEFAULT 5,
+  confidence REAL DEFAULT 0.8,
+  embedding BLOB,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_accessed DATETIME,
+  access_count INTEGER DEFAULT 0,
+  tags TEXT,
+  source TEXT
+);
+```
+
+### ⚙️ 依赖安装
+
+```bash
+# 安装 SQLite 依赖
+npm install better-sqlite3
+npm install @types/better-sqlite3 -D
+```
+
+### 🎯 预期效果
+
+1. **被动记忆**：对话中自动记录用户喜好、个人信息
+2. **智能检索**：根据对话上下文检索相关记忆
+3. **主动提问**：发现信息缺口时主动询问用户
+4. **记忆衰减**：长期未访问的记忆自动降低权重
+
+---
+
 ## 更新日志
 
+### 2026-04-13 🎉 **历史性突破！向量去重功能完美运行！**
+- ✅ **修复 Buffer 转换问题** - 解决了 `Float64Array` 读取 Buffer 的关键 bug
+  - 问题：`new Float64Array(buffer)` 得到的是字节值 `[0, 0, 0, 192, 247]`
+  - 解决：`new Float64Array(buffer.buffer)` 正确获取底层 ArrayBuffer
+- ✅ **向量相似度计算成功** - 相似度从 0.000 → 1.000 🚀
+- ✅ **记忆去重功能完美运行** - 相同内容自动跳过，不再重复添加
+- ✅ **设置面板新增记忆管理** - 显示记忆数量 + 清空记忆按钮
+- ✅ **文本相似度算法升级** - 从 Jaccard 升级为编辑距离（Levenshtein Distance）
+
 ### 2026-04-12
-- ✅ 新增动作管理器，自动扫描和加载模型的所有可用动作
-- ✅ AI 可以在回复中使用 `[动作:动作名]` 格式触发 Live2D 动作
-- ✅ 动作播放完成后自动恢复到待机状态，确保角色自然过渡
-- ✅ 优化动作列表格式，支持中文描述和英文文件名
-- ✅ 优化 Prompt，添加详细的动作使用说明和示例
-- ✅ 优化流式响应日志，只保留最终的聊天记录和统计信息
-- ✅ 添加动作播放的调试日志，方便排查问题
+- ✅ **Phase 1 完成** - 记忆系统基础架构已就绪！
+  - ✅ 新增记忆提取功能，自动从对话中提取用户信息
+  - ✅ 新增记忆提取器 `memoryExtractor.ts`
+  - ✅ 集成记忆检索到 `chatService.ts`
+- ✅ **Phase 2 完成** - 记忆自动提取功能已上线！
+  - ✅ 新增 `memoryExtractor.ts` - AI 自动从对话中提取记忆
+  - ✅ 对话完成后自动调用 Ollama 提取记忆
+  - ✅ 记忆去重和合并功能
+  - ✅ 记忆重要性评估功能
 
 ### 2024-04-11
 - ✅ 接入本地 Ollama API，支持流式响应
@@ -265,10 +389,10 @@ const OLLAMA_MODEL = 'qwen3.5:9b';
 - ✅ 气泡采用毛玻璃效果，颜色追随用户自定义
 - ✅ 添加女友名字设置，名字为空时使用模型名称
 - ✅ 添加角色设定（systemPrompt）自定义功能
-- ✅ 气泡支持 Markdown 渲染（粗体、斜体、代码、删除线）
+- ✅ 气泡支持 Markdown 渲染（粗体、斜体、代码、删除线)
 - ✅ 气泡内容过长时自动滚动，顶部渐变淡出
 - ✅ 双击窗口任意位置切换输入框显示/隐藏
-- ✅ 优化 Ollama 显存使用（减小上下文、设置 keep_alive）
+- ✅ 优化 Ollama 显存使用（减小上下文、设置 keep_alive)
 - ✅ 禁用 qwen3.5 思考模式，大幅提升响应速度
 - ✅ 控制台输出完整聊天记录和统计信息
 

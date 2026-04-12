@@ -133,6 +133,17 @@
             </div>
           </div>
           
+          <div class="setting-group memory-section">
+            <label>记忆管理</label>
+            <div class="memory-stats">
+              <span class="memory-count">已记录 {{ memoryCount }} 条记忆</span>
+              <button class="btn btn-danger" @click="clearMemories" :disabled="memoryCount === 0">
+                清空记忆
+              </button>
+            </div>
+            <p class="hint">AI 会自动记住你的喜好和个人信息</p>
+          </div>
+          
           <div class="setting-actions">
             <button class="btn btn-primary" @click="saveSettings">保存设置</button>
             <button class="btn btn-secondary" @click="$emit('cancel')">取消</button>
@@ -144,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 
 const props = defineProps<{
   visible: boolean;
@@ -176,6 +187,7 @@ const emit = defineEmits<{
     offsetX: number;
     offsetY: number;
   }];
+  clearMemories: [];
 }>();
 
 const modelPath = ref(props.currentPath);
@@ -187,6 +199,18 @@ const eyeTracking = ref(props.currentEyeTracking);
 const systemPrompt = ref('');
 const girlfriendName = ref('');
 const isSliding = ref(false);
+const memoryCount = ref(0);
+
+const loadMemoryCount = async () => {
+  if (window.electronAPI?.memory) {
+    try {
+      const stats = await window.electronAPI.memory.getStats();
+      memoryCount.value = stats.totalMemories || 0;
+    } catch (error) {
+      console.warn('[Settings] 获取记忆统计失败:', error);
+    }
+  }
+};
 
 watch(() => props.visible, (visible) => {
   if (visible) {
@@ -198,7 +222,12 @@ watch(() => props.visible, (visible) => {
     eyeTracking.value = props.currentEyeTracking ?? true;
     systemPrompt.value = props.currentSystemPrompt || '';
     girlfriendName.value = props.currentGirlfriendName || '';
+    loadMemoryCount();
   }
+});
+
+onMounted(() => {
+  loadMemoryCount();
 });
 
 const startSliding = () => {
@@ -222,6 +251,21 @@ const browseFolder = async () => {
     const result = await window.electronAPI.openFolderDialog();
     if (result && !result.canceled && result.filePaths.length > 0) {
       modelPath.value = result.filePaths[0];
+    }
+  }
+};
+
+const clearMemories = async () => {
+  if (window.electronAPI?.memory?.clearAll) {
+    try {
+      const result = await window.electronAPI.memory.clearAll();
+      if (result.success) {
+        memoryCount.value = 0;
+        emit('clearMemories');
+        console.log('[Settings] 已清空所有记忆，共删除', result.count, '条');
+      }
+    } catch (error) {
+      console.error('[Settings] 清空记忆失败:', error);
     }
   }
 };
@@ -594,6 +638,43 @@ const saveSettings = () => {
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.9);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.memory-section {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.memory-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.memory-count {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .panel-fade-enter-active,

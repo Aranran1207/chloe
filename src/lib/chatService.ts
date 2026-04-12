@@ -8,12 +8,21 @@ export interface MotionTrigger {
   position: number;
 }
 
+import { memoryClient } from './memory/memoryClient';
+import { memoryIntegrator } from './memory/memoryIntegrator';
+import { memoryExtractor } from './memory/memoryExtractor';
+import type { Memory } from './memory/memoryTypes';
+
 const OLLAMA_API_URL = 'http://localhost:11434';
 const OLLAMA_MODEL = 'qwen3.5:9b';
 
-const buildDefaultPrompt = (name: string, modelName?: string, availableMotions?: string): string => {
+const buildDefaultPrompt = (name: string, modelName?: string, availableMotions?: string, memories?: Memory[]): string => {
   const displayName = name || modelName || 'Chloe';
   let prompt = `你是${displayName}，我的女友。请用可爱的语气回复，称呼我为"亲爱的"。`;
+  
+  if (memories && memories.length > 0) {
+    prompt = memoryIntegrator.buildMemoryPrompt(prompt, memories);
+  }
   
   if (availableMotions && availableMotions !== '当前模型没有可用动作') {
     prompt += `\n\n【重要】你可以通过动作来表达情感，让回复更加生动有趣！`;
@@ -37,6 +46,72 @@ const OLLAMA_OPTIONS = {
   num_ctx: 4096,
   keep_alive: "1m"
 };
+
+async function getRelevantMemories(message: string): Promise<Memory[]> {
+  if (!memoryClient.isAvailable()) {
+    return [];
+  }
+  
+  try {
+    return await memoryClient.getRelevantMemories(message, 5);
+  } catch (error) {
+    console.warn('[Memory] 获取相关记忆失败:', error);
+    return [];
+  }
+}
+
+async function extractAndSaveMemory(userMessage: string, aiResponse: string): Promise<void> {
+  if (!memoryClient.isAvailable()) {
+    return;
+  }
+  
+  if (!memoryExtractor.shouldExtract(userMessage)) {
+    return;
+  }
+  
+  try {
+    console.log('[Memory] 正在提取记忆...');
+    const extractedMemories = await memoryExtractor.extractFromConversation(userMessage, aiResponse);
+    
+    let savedCount = 0;
+    let duplicateCount = 0;
+    let updatedCount = 0;
+    
+    for (const extracted of extractedMemories) {
+      const result = await memoryClient.addMemory({
+        content: extracted.content,
+        category: extracted.category,
+        importance: extracted.importance,
+        confidence: extracted.confidence,
+        tags: extracted.tags,
+        source: {
+          type: 'conversation',
+          userMessage: userMessage
+        }
+      });
+      
+      if (result) {
+        if ((result as any).duplicate) {
+          duplicateCount++;
+        } else if ((result as any).updated) {
+          updatedCount++;
+        } else {
+          savedCount++;
+        }
+      }
+    }
+    
+    if (extractedMemories.length > 0) {
+      const parts = [];
+      if (savedCount > 0) parts.push(`新增 ${savedCount} 条`);
+      if (updatedCount > 0) parts.push(`更新 ${updatedCount} 条`);
+      if (duplicateCount > 0) parts.push(`跳过 ${duplicateCount} 条重复`);
+      console.log(`[Memory] ${parts.join('，')}`);
+    }
+  } catch (error) {
+    console.warn('[Memory] 提取记忆失败:', error);
+  }
+}
 
 export function parseMotionTriggers(text: string): { cleanText: string; motions: MotionTrigger[] } {
   const motionRegex = /\[动作:([^\]]+)\]/g;
@@ -129,11 +204,18 @@ export async function sendMessageStream(
   availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
-  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions);
+  
+  const memories = await getRelevantMemories(message);
+  if (memories.length > 0) {
+    console.log('[Memory] 找到相关记忆:', memories.length, '条');
+  }
+  
+  const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions, memories);
   
   console.log('[Ollama] 发送流式请求:', {
     model: OLLAMA_MODEL,
     message: message,
+    memoriesCount: memories.length,
     timestamp: new Date().toISOString()
   });
 
@@ -211,6 +293,8 @@ export async function sendMessageStream(
             console.log('========================================');
             console.log(`[统计] 耗时: ${duration}s | 速度: ${(fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)} 字符/秒`);
             console.log('========================================\n');
+            
+            extractAndSaveMemory(message, fullContent);
           }
         } catch (e) {
           // 静默处理解析错误
