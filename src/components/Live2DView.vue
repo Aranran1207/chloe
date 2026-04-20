@@ -1,13 +1,14 @@
 <template>
   <div ref="containerRef" class="live2d-container" 
        :class="{ 'is-dragging': isDraggingWindow }"
+       :style="{ width: windowWidth + 'px', height: windowHeight + 'px' }"
        @mousedown="handleMouseDown" 
        @mousemove="handleMouseMove"
        @mouseup="handleMouseUp" 
        @mouseleave="handleMouseUp"
        @dblclick="handleDoubleClick"
        @contextmenu.prevent="showContextMenu">
-    <canvas ref="canvasRef" class="live2d-canvas"></canvas>
+    <canvas ref="canvasRef" class="live2d-canvas" :style="{ width: windowWidth + 'px', height: windowHeight + 'px' }"></canvas>
     <div v-if="isDraggingWindow" class="drag-border"></div>
     
     <LoadingSpinner :visible="isLoading" :text="loadingText" />
@@ -97,6 +98,8 @@
       :currentEyeTracking="eyeTrackingEnabled"
       :currentSystemPrompt="systemPrompt"
       :currentGirlfriendName="girlfriendName"
+      :currentWindowWidth="windowWidth"
+      :currentWindowHeight="windowHeight"
       @close="showSettings = false"
       @cancel="handleCancelSettings"
       @save="handleSaveSettings"
@@ -189,6 +192,8 @@ const girlfriendName = ref('');
 const showThinking = ref(false);
 const thinkingPosition = ref({ x: 250, y: 350 });
 const showMemoryPanel = ref(false);
+const windowWidth = ref(500);
+const windowHeight = ref(800);
 
 let motionManager: MotionManager | null = null;
 
@@ -200,10 +205,11 @@ const handleProactiveQuestion = async (question: string) => {
   
   console.log('[Live2DView] 收到主动提问:', question);
   
-  const containerWidth = containerRef.value?.clientWidth || 500;
+  const containerWidth = containerRef.value?.clientWidth || windowWidth.value;
+  const containerHeight = containerRef.value?.clientHeight || windowHeight.value;
   thinkingPosition.value = {
     x: containerWidth / 2,
-    y: 350
+    y: containerHeight * 0.45
   };
   
   showThinking.value = true;
@@ -302,10 +308,11 @@ const handleSendMessage = async (message: string) => {
   
   proactiveEngine.resetSession();
   
-  const containerWidth = containerRef.value?.clientWidth || 500;
+  const containerWidth = containerRef.value?.clientWidth || windowWidth.value;
+  const containerHeight = containerRef.value?.clientHeight || windowHeight.value;
   thinkingPosition.value = {
     x: containerWidth / 2,
-    y: 350
+    y: containerHeight * 0.45
   };
   
   showThinking.value = true;
@@ -357,18 +364,18 @@ const handleSendMessage = async (message: string) => {
 
 const showContextMenu = (e: MouseEvent) => {
   const menuWidth = 170;
-  const menuHeight = 200;
+  const menuHeight = 240;
   const padding = 10;
   
   let x = e.clientX;
   let y = e.clientY;
   
-  if (x + menuWidth + padding > 500) {
-    x = 500 - menuWidth - padding;
+  if (x + menuWidth + padding > windowWidth.value) {
+    x = windowWidth.value - menuWidth - padding;
   }
   
-  if (y + menuHeight + padding > 800) {
-    y = 800 - menuHeight - padding;
+  if (y + menuHeight + padding > windowHeight.value) {
+    y = windowHeight.value - menuHeight - padding;
   }
   
   x = Math.max(padding, x);
@@ -411,12 +418,12 @@ const showModelSwitcher = async () => {
   let x = menuX.value + 170;
   let y = menuY.value - 50;
   
-  if (x + modelMenuWidth + padding > 500) {
+  if (x + modelMenuWidth + padding > windowWidth.value) {
     x = menuX.value - modelMenuWidth - 10;
   }
   
-  if (y + modelMenuHeight + padding > 800) {
-    y = 800 - modelMenuHeight - padding;
+  if (y + modelMenuHeight + padding > windowHeight.value) {
+    y = windowHeight.value - modelMenuHeight - padding;
   }
   
   y = Math.max(padding, y);
@@ -481,6 +488,8 @@ const handleSaveSettings = async (settings: {
   eyeTracking: boolean;
   systemPrompt: string;
   girlfriendName: string;
+  windowWidth: number;
+  windowHeight: number;
 }) => {
   let normalizedPath = settings.path;
   if (!normalizedPath.endsWith('/') && !normalizedPath.endsWith('\\')) {
@@ -494,6 +503,17 @@ const handleSaveSettings = async (settings: {
   bubbleColor.value = settings.bubbleColor;
   systemPrompt.value = settings.systemPrompt;
   girlfriendName.value = settings.girlfriendName;
+  
+  if (settings.windowWidth !== windowWidth.value || settings.windowHeight !== windowHeight.value) {
+    windowWidth.value = settings.windowWidth;
+    windowHeight.value = settings.windowHeight;
+    if (window.electronAPI?.setWindowSize) {
+      window.electronAPI.setWindowSize(settings.windowWidth, settings.windowHeight);
+    }
+    setTimeout(() => {
+      resizeCanvas();
+    }, 100);
+  }
   
   if (settings.eyeTracking !== eyeTrackingEnabled.value) {
     eyeTrackingEnabled.value = settings.eyeTracking;
@@ -516,7 +536,9 @@ const handleSaveSettings = async (settings: {
       bubbleColor: settings.bubbleColor,
       eyeTracking: settings.eyeTracking,
       systemPrompt: settings.systemPrompt,
-      girlfriendName: settings.girlfriendName
+      girlfriendName: settings.girlfriendName,
+      windowWidth: settings.windowWidth,
+      windowHeight: settings.windowHeight
     }).then(() => {
       saveToastText.value = '保存成功';
       showSaveToast.value = true;
@@ -586,6 +608,12 @@ const loadConfig = async () => {
     }
     if (config.eyeTracking !== undefined) {
       eyeTrackingEnabled.value = config.eyeTracking;
+    }
+    if (config.windowWidth !== undefined) {
+      windowWidth.value = config.windowWidth;
+    }
+    if (config.windowHeight !== undefined) {
+      windowHeight.value = config.windowHeight;
     }
     modelList.value = await window.electronAPI.getModelList();
     
@@ -661,9 +689,9 @@ const handleGlobalMouseMove = async (data: { x: number; y: number }) => {
 
 onMounted(async () => {
   if (canvasRef.value && containerRef.value) {
-    resizeCanvas();
-    
     await loadConfig();
+    
+    resizeCanvas();
     
     if (currentModel.value) {
       loadingText.value = `正在加载 ${currentModel.value.name}...`;
@@ -734,8 +762,6 @@ onUnmounted(() => {
 
 <style scoped>
 .live2d-container {
-  width: 500px !important;
-  height: 800px !important;
   position: relative !important;
   cursor: default;
   overflow: hidden;
@@ -744,8 +770,6 @@ onUnmounted(() => {
 
 .live2d-canvas {
   display: block;
-  width: 500px !important;
-  height: 800px !important;
 }
 
 .context-menu {

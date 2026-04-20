@@ -1,7 +1,7 @@
 <template>
   <Transition name="panel-fade">
-    <div v-if="visible" class="settings-overlay" :class="{ 'is-sliding': isSliding }" @click.self="$emit('cancel')">
-      <div class="settings-panel" :class="{ 'is-sliding': isSliding }">
+    <div v-if="visible" class="settings-overlay" :class="{ 'is-sliding': isSliding }" @click.self="$emit('cancel')" @dblclick.stop @mousedown.stop>
+      <div class="settings-panel" :class="{ 'is-sliding': isSliding }" @dblclick.stop @mousedown.stop>
         <div class="panel-header">
           <h2>设置</h2>
           <button class="close-btn" @click="$emit('close')">
@@ -24,6 +24,41 @@
               <button class="browse-btn" @click="browseFolder">浏览</button>
             </div>
             <p class="hint">例如: ./resources/ 或 D:/Live2D/models/</p>
+          </div>
+          
+          <div class="setting-group">
+            <label>窗口大小</label>
+            <div class="window-size-container">
+              <div class="size-input-group">
+                <label>宽度</label>
+                <input 
+                  type="text"
+                  :value="windowWidth"
+                  @input="windowWidth = parseInt(($event.target as HTMLInputElement).value) || 500"
+                  class="size-input"
+                  @click.stop
+                  @dblclick.stop
+                  @mousedown.stop
+                  placeholder="300-800"
+                />
+                <span class="size-unit">px</span>
+              </div>
+              <div class="size-input-group">
+                <label>高度</label>
+                <input 
+                  type="text"
+                  :value="windowHeight"
+                  @input="windowHeight = parseInt(($event.target as HTMLInputElement).value) || 800"
+                  class="size-input"
+                  @click.stop
+                  @dblclick.stop
+                  @mousedown.stop
+                  placeholder="500-1200"
+                />
+                <span class="size-unit">px</span>
+              </div>
+            </div>
+            <p class="hint">最小: 300×500 / 最大: 800×1200</p>
           </div>
           
           <div class="setting-group">
@@ -167,6 +202,8 @@ const props = defineProps<{
   currentEyeTracking: boolean;
   currentSystemPrompt?: string;
   currentGirlfriendName?: string;
+  currentWindowWidth?: number;
+  currentWindowHeight?: number;
 }>();
 
 const emit = defineEmits<{
@@ -181,6 +218,8 @@ const emit = defineEmits<{
     eyeTracking: boolean;
     systemPrompt: string;
     girlfriendName: string;
+    windowWidth: number;
+    windowHeight: number;
   }];
   updateTransform: [settings: {
     scale: number;
@@ -200,6 +239,8 @@ const systemPrompt = ref('');
 const girlfriendName = ref('');
 const isSliding = ref(false);
 const memoryCount = ref(0);
+const windowWidth = ref(500);
+const windowHeight = ref(800);
 
 const loadMemoryCount = async () => {
   if (window.electronAPI?.memory) {
@@ -222,6 +263,8 @@ watch(() => props.visible, (visible) => {
     eyeTracking.value = props.currentEyeTracking ?? true;
     systemPrompt.value = props.currentSystemPrompt || '';
     girlfriendName.value = props.currentGirlfriendName || '';
+    windowWidth.value = props.currentWindowWidth || 500;
+    windowHeight.value = props.currentWindowHeight || 800;
     loadMemoryCount();
   }
 });
@@ -271,6 +314,9 @@ const clearMemories = async () => {
 };
 
 const saveSettings = () => {
+  const clampedWidth = Math.max(300, Math.min(800, windowWidth.value || 500));
+  const clampedHeight = Math.max(500, Math.min(1200, windowHeight.value || 800));
+  
   emit('save', {
     path: modelPath.value,
     scale: modelScale.value,
@@ -279,7 +325,9 @@ const saveSettings = () => {
     bubbleColor: bubbleColor.value,
     eyeTracking: eyeTracking.value,
     systemPrompt: systemPrompt.value,
-    girlfriendName: girlfriendName.value
+    girlfriendName: girlfriendName.value,
+    windowWidth: clampedWidth,
+    windowHeight: clampedHeight
   });
   emit('close');
 };
@@ -292,8 +340,8 @@ const saveSettings = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -302,26 +350,41 @@ const saveSettings = () => {
 }
 
 .settings-overlay.is-sliding {
-  background: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(1px);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
 }
 
 .settings-panel {
-  background: linear-gradient(135deg, rgba(40, 40, 50, 0.98) 0%, rgba(30, 30, 40, 0.99) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  width: 450px;
+  background: linear-gradient(145deg, rgba(35, 35, 45, 0.98) 0%, rgba(25, 25, 35, 0.99) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  width: 420px;
   max-width: 90%;
-  max-height: 90vh;
+  max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 
+    0 25px 80px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
   transition: all 0.3s ease;
 }
 
+.settings-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
 .settings-panel.is-sliding {
-  background: linear-gradient(135deg, rgba(40, 40, 50, 0.3) 0%, rgba(30, 30, 40, 0.4) 100%);
-  border-color: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(145deg, rgba(35, 35, 45, 0.4) 0%, rgba(25, 25, 35, 0.5) 100%);
+  border-color: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
 }
 
 .panel-header {
@@ -329,32 +392,33 @@ const saveSettings = () => {
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   position: sticky;
   top: 0;
-  background: linear-gradient(135deg, rgba(40, 40, 50, 0.98) 0%, rgba(30, 30, 40, 0.99) 100%);
+  background: linear-gradient(145deg, rgba(35, 35, 45, 0.98) 0%, rgba(25, 25, 35, 0.99) 100%);
   z-index: 1;
   transition: all 0.3s ease;
 }
 
 .settings-panel.is-sliding .panel-header {
-  background: linear-gradient(135deg, rgba(40, 40, 50, 0.3) 0%, rgba(30, 30, 40, 0.4) 100%);
-  border-bottom-color: rgba(255, 255, 255, 0.05);
+  background: linear-gradient(145deg, rgba(35, 35, 45, 0.4) 0%, rgba(25, 25, 35, 0.5) 100%);
+  border-bottom-color: rgba(255, 255, 255, 0.03);
 }
 
 .panel-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.3px;
 }
 
 .close-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border: none;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -363,64 +427,79 @@ const saveSettings = () => {
 }
 
 .close-btn:hover {
-  background: rgba(255, 100, 100, 0.2);
+  background: rgba(239, 68, 68, 0.15);
+  transform: rotate(90deg);
 }
 
 .close-btn svg {
-  width: 18px;
-  height: 18px;
-  color: rgba(255, 255, 255, 0.7);
+  width: 16px;
+  height: 16px;
+  color: rgba(255, 255, 255, 0.6);
+  transition: color 0.2s;
+}
+
+.close-btn:hover svg {
+  color: #ef4444;
 }
 
 .panel-content {
-  padding: 24px;
+  padding: 20px 24px 24px;
 }
 
 .setting-group {
-  margin-bottom: 24px;
+  margin-bottom: 22px;
+}
+
+.setting-group:last-child {
+  margin-bottom: 0;
 }
 
 .setting-group label {
-  display: block;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .input-group {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
 .input-group input {
   flex: 1;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  padding: 11px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.2s;
 }
 
 .input-group input:focus {
   outline: none;
-  border-color: rgba(100, 150, 255, 0.5);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(102, 126, 234, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .input-group input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .browse-btn {
-  padding: 12px 20px;
-  background: rgba(100, 150, 255, 0.15);
-  border: 1px solid rgba(100, 150, 255, 0.3);
-  border-radius: 8px;
-  color: #64b5f6;
-  font-size: 14px;
+  padding: 11px 18px;
+  background: rgba(102, 126, 234, 0.12);
+  border: 1px solid rgba(102, 126, 234, 0.25);
+  border-radius: 10px;
+  color: #818cf8;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -428,67 +507,127 @@ const saveSettings = () => {
 }
 
 .browse-btn:hover {
-  background: rgba(100, 150, 255, 0.25);
-  border-color: rgba(100, 150, 255, 0.5);
+  background: rgba(102, 126, 234, 0.2);
+  border-color: rgba(102, 126, 234, 0.4);
+  transform: translateY(-1px);
 }
 
 .hint {
   margin: 8px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.window-size-container {
+  display: flex;
+  gap: 12px;
+}
+
+.size-input-group {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 12px;
+  transition: all 0.2s;
+}
+
+.size-input-group:focus-within {
+  border-color: rgba(102, 126, 234, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.size-input-group label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  min-width: 28px;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.size-input {
+  flex: 1;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  text-align: center;
+  outline: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.size-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
   font-size: 12px;
+}
+
+.size-unit {
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.4);
+  min-width: 18px;
 }
 
 .name-input {
   width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  padding: 11px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.2s;
   box-sizing: border-box;
 }
 
 .name-input:focus {
   outline: none;
-  border-color: rgba(100, 150, 255, 0.5);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(102, 126, 234, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .name-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .prompt-textarea {
   width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
   resize: vertical;
   min-height: 80px;
   transition: all 0.2s;
   box-sizing: border-box;
+  line-height: 1.5;
 }
 
 .prompt-textarea:focus {
   outline: none;
-  border-color: rgba(100, 150, 255, 0.5);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(102, 126, 234, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .prompt-textarea::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .slider-container {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  padding: 8px 0;
 }
 
 .slider {
@@ -496,50 +635,73 @@ const saveSettings = () => {
   height: 6px;
   -webkit-appearance: none;
   appearance: none;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   outline: none;
   cursor: pointer;
+  position: relative;
+  margin: 0;
 }
 
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(145deg, #818cf8 0%, #6366f1 100%);
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+  margin-top: -5px;
 }
 
 .slider::-webkit-slider-thumb:hover {
   transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.5);
+}
+
+.slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 10px;
 }
 
 .slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(145deg, #818cf8 0%, #6366f1 100%);
   border-radius: 50%;
   cursor: pointer;
   border: none;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
 }
 
 .slider::-moz-range-thumb:hover {
   transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.5);
+}
+
+.slider::-moz-range-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  height: 6px;
 }
 
 .slider-value {
-  min-width: 50px;
+  min-width: 48px;
   text-align: right;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px 8px;
+  border-radius: 6px;
 }
 
 .toggle-container {
@@ -551,7 +713,7 @@ const saveSettings = () => {
 .toggle {
   position: relative;
   display: inline-block;
-  width: 50px;
+  width: 48px;
   height: 26px;
 }
 
@@ -568,10 +730,10 @@ const saveSettings = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.1);
-  transition: 0.3s;
+  background: rgba(255, 255, 255, 0.08);
+  transition: 0.25s ease;
   border-radius: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .toggle-slider:before {
@@ -581,88 +743,135 @@ const saveSettings = () => {
   width: 20px;
   left: 2px;
   bottom: 2px;
-  background-color: white;
-  transition: 0.3s;
+  background: rgba(255, 255, 255, 0.9);
+  transition: 0.25s ease;
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .toggle input:checked + .toggle-slider {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(145deg, #818cf8 0%, #6366f1 100%);
   border-color: transparent;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
 }
 
 .toggle input:checked + .toggle-slider:before {
-  transform: translateX(24px);
+  transform: translateX(22px);
 }
 
 .toggle-label {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.color-picker-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.color-picker {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker::-webkit-color-swatch {
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.color-preview {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.color-value {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  text-transform: uppercase;
 }
 
 .setting-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   justify-content: flex-end;
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .btn {
-  padding: 12px 24px;
+  padding: 11px 22px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(145deg, #818cf8 0%, #6366f1 100%);
   color: white;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.9);
 }
 
 .btn-danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  padding: 8px 16px;
-  font-size: 13px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 8px 14px;
+  font-size: 12px;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
 .btn-danger:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .memory-section {
   background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .memory-stats {
@@ -673,8 +882,8 @@ const saveSettings = () => {
 }
 
 .memory-count {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .panel-fade-enter-active,
@@ -689,6 +898,6 @@ const saveSettings = () => {
 
 .panel-fade-enter-from .settings-panel,
 .panel-fade-leave-to .settings-panel {
-  transform: scale(0.95) translateY(20px);
+  transform: scale(0.96) translateY(15px);
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
   <Transition name="panel-fade">
-    <div v-if="visible" class="memory-overlay" @click.self="$emit('close')">
-      <div class="memory-panel">
+    <div v-if="visible" class="memory-overlay" @click.self="$emit('close')" @dblclick.stop @mousedown.stop>
+      <div class="memory-panel" @dblclick.stop @mousedown.stop>
         <div class="panel-header">
           <h2>记忆管理</h2>
           <button class="close-btn" @click="$emit('close')">

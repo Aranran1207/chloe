@@ -17,8 +17,15 @@ let config = {
   bubbleColor: '#8b5cf6',
   eyeTracking: true,
   systemPrompt: '',
-  girlfriendName: ''
+  girlfriendName: '',
+  windowWidth: 500,
+  windowHeight: 800
 };
+
+const MIN_WINDOW_WIDTH = 300;
+const MIN_WINDOW_HEIGHT = 500;
+const MAX_WINDOW_WIDTH = 800;
+const MAX_WINDOW_HEIGHT = 1200;
 
 function initMemoryDatabase() {
   const memoryDbPath = path.join(__dirname, '../../chloe-memory.db');
@@ -92,8 +99,8 @@ function saveConfig() {
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const windowWidth = 500;
-  const windowHeight = 800;
+  const windowWidth = config.windowWidth || 500;
+  const windowHeight = config.windowHeight || 800;
   const margin = 20;
 
   mainWindow = new BrowserWindow({
@@ -114,15 +121,8 @@ function createWindow() {
     }
   });
 
-  mainWindow.setMinimumSize(500, 800);
-  mainWindow.setMaximumSize(500, 800);
-
-  mainWindow.on('resized', () => {
-    const [width, height] = mainWindow.getSize();
-    if (width !== 500 || height !== 800) {
-      mainWindow.setSize(500, 800);
-    }
-  });
+  mainWindow.setMinimumSize(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
+  mainWindow.setMaximumSize(MAX_WINDOW_WIDTH, MAX_WINDOW_HEIGHT);
 
   mainWindow.on('ready-to-show', () => {
     // 调试时可以启用以下边框
@@ -172,12 +172,26 @@ ipcMain.handle('get-window-position', () => {
 });
 
 ipcMain.on('set-window-position', (event, { x, y }) => {
+  const [width, height] = mainWindow.getSize();
   mainWindow.setBounds({
     x: Math.round(x),
     y: Math.round(y),
-    width: 500,
-    height: 800
+    width: width,
+    height: height
   });
+});
+
+ipcMain.handle('get-window-size', () => {
+  return mainWindow.getSize();
+});
+
+ipcMain.on('set-window-size', (event, { width, height }) => {
+  const clampedWidth = Math.max(MIN_WINDOW_WIDTH, Math.min(MAX_WINDOW_WIDTH, width));
+  const clampedHeight = Math.max(MIN_WINDOW_HEIGHT, Math.min(MAX_WINDOW_HEIGHT, height));
+  mainWindow.setSize(clampedWidth, clampedHeight);
+  config.windowWidth = clampedWidth;
+  config.windowHeight = clampedHeight;
+  saveConfig();
 });
 
 let globalMouseTracking = false;

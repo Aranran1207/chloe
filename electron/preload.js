@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeApp: () => ipcRenderer.send('minimize-app'),
   getWindowPosition: () => ipcRenderer.invoke('get-window-position'),
   setWindowPosition: (x, y) => ipcRenderer.send('set-window-position', { x, y }),
+  getWindowSize: () => ipcRenderer.invoke('get-window-size'),
+  setWindowSize: (width, height) => ipcRenderer.send('set-window-size', { width, height }),
   startGlobalMouseTracking: () => ipcRenderer.send('start-global-mouse-tracking'),
   stopGlobalMouseTracking: () => ipcRenderer.send('stop-global-mouse-tracking'),
   onGlobalMouseMove: (callback) => ipcRenderer.on('global-mouse-move', (event, data) => callback(data)),

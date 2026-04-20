@@ -20,6 +20,8 @@ declare global {
         getStats: () => Promise<MemoryStats>;
         searchByEmbedding: (embedding: number[], topK?: number) => Promise<MemorySearchResult[]>;
       };
+      getWindowSize: () => Promise<[number, number]>;
+      setWindowSize: (width: number, height: number) => void;
     };
   }
 }

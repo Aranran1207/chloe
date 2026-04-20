@@ -1,7 +1,7 @@
 <template>
   <Transition name="input-fade">
-    <div v-if="visible" class="chat-input-overlay" @click.self="$emit('cancel')">
-      <div class="chat-input-container">
+    <div v-if="visible" class="chat-input-overlay" @click.self="$emit('cancel')" @dblclick.stop @mousedown.stop>
+      <div class="chat-input-container" @dblclick.stop @mousedown.stop>
         <div class="input-wrapper">
           <input
             ref="inputRef"
