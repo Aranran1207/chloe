@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
@@ -6,6 +6,7 @@ const Database = require('better-sqlite3');
 const isDev = !app.isPackaged;
 
 let mainWindow;
+let tray = null;
 let configPath;
 let memoryDb;
 let config = {
@@ -103,6 +104,10 @@ function createWindow() {
   const windowHeight = config.windowHeight || 800;
   const margin = 20;
 
+  const iconPath = isDev 
+    ? path.join(__dirname, '../src/assets/logo.ico')
+    : path.join(process.resourcesPath, 'assets/logo.ico');
+
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
@@ -112,7 +117,8 @@ function createWindow() {
     transparent: true,
     alwaysOnTop: true,
     resizable: false,
-    skipTaskbar: true,
+    skipTaskbar: false,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -143,6 +149,14 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  mainWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+    return false;
   });
 }
 
@@ -630,11 +644,114 @@ app.whenReady().then(() => {
   loadConfig();
   initMemoryDatabase();
   createWindow();
+  createTray();
 });
+
+function createTray() {
+  const iconPath = isDev 
+    ? path.join(__dirname, '../src/assets/logo.ico')
+    : path.join(process.resourcesPath, 'assets/logo.ico');
+  
+  const icon = nativeImage.createFromPath(iconPath);
+  
+  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  
+  const updateContextMenu = () => {
+    const isVisible = mainWindow ? mainWindow.isVisible() : false;
+    const isAlwaysOnTop = mainWindow ? mainWindow.isAlwaysOnTop() : true;
+    
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: isVisible ? '● 已显示' : '○ 已隐藏',
+        enabled: false
+      },
+      {
+        type: 'separator'
+      },
+      {
+        label: isVisible ? '隐藏窗口' : '显示窗口',
+        click: () => {
+          if (mainWindow) {
+            if (isVisible) {
+              mainWindow.hide();
+            } else {
+              mainWindow.show();
+              mainWindow.focus();
+            }
+            updateContextMenu();
+          }
+        }
+      },
+      {
+        type: 'separator'
+      },
+      {
+        label: '置顶显示',
+        type: 'checkbox',
+        checked: isAlwaysOnTop,
+        click: (menuItem) => {
+          if (mainWindow) {
+            mainWindow.setAlwaysOnTop(menuItem.checked);
+            updateContextMenu();
+          }
+        }
+      },
+      {
+        type: 'separator'
+      },
+      {
+        label: '退出',
+        click: () => {
+          if (memoryDb) {
+            memoryDb.close();
+          }
+          app.quit();
+        }
+      }
+    ]);
+    
+    tray.setContextMenu(contextMenu);
+  };
+  
+  tray.setToolTip('Chloe - AI女友桌面宠物');
+  updateContextMenu();
+  
+  mainWindow.on('show', updateContextMenu);
+  mainWindow.on('hide', updateContextMenu);
+  
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+  
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.focus();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
+  if (memoryDb) {
+    memoryDb.close();
   }
 });
 
