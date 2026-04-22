@@ -157,6 +157,106 @@
             <p class="hint">定义角色的性格、说话风格等，留空使用默认设定</p>
           </div>
           
+          <div class="setting-group ai-provider-section">
+            <label>AI 模型配置</label>
+            
+            <div class="provider-type-selector">
+              <button 
+                class="provider-btn"
+                :class="{ active: aiProviderType === 'ollama' }"
+                @click="aiProviderType = 'ollama'"
+              >
+                <span class="provider-icon">🏠</span>
+                <span class="provider-name">本地 Ollama</span>
+                <span class="provider-status" :class="{ available: ollamaAvailable }">
+                  {{ ollamaAvailable ? '可用' : '离线' }}
+                </span>
+              </button>
+              <button 
+                class="provider-btn"
+                :class="{ active: aiProviderType === 'openai' }"
+                @click="aiProviderType = 'openai'"
+              >
+                <span class="provider-icon">☁️</span>
+                <span class="provider-name">云端 API</span>
+                <span class="provider-status" :class="{ available: openaiAvailable }">
+                  {{ openaiAvailable ? '已配置' : '未配置' }}
+                </span>
+              </button>
+            </div>
+            
+            <div class="provider-config" v-if="aiProviderType === 'ollama'">
+              <div class="config-row">
+                <label>API 地址</label>
+                <input 
+                  v-model="ollamaApiUrl" 
+                  type="text" 
+                  class="config-input"
+                  placeholder="http://localhost:11434"
+                />
+              </div>
+              <div class="config-row">
+                <label>聊天模型</label>
+                <input 
+                  v-model="ollamaChatModel" 
+                  type="text" 
+                  class="config-input"
+                  placeholder="qwen3.5:9b"
+                />
+              </div>
+              <div class="config-row">
+                <label>嵌入模型</label>
+                <input 
+                  v-model="ollamaEmbeddingModel" 
+                  type="text" 
+                  class="config-input"
+                  placeholder="nomic-embed-text-v2-moe:latest"
+                />
+              </div>
+              <p class="hint">本地推理，无需联网，低延迟</p>
+            </div>
+            
+            <div class="provider-config" v-if="aiProviderType === 'openai'">
+              <div class="config-row">
+                <label>API 地址</label>
+                <input 
+                  v-model="openaiApiUrl" 
+                  type="text" 
+                  class="config-input"
+                  placeholder="https://api.openai.com/v1"
+                />
+              </div>
+              <div class="config-row">
+                <label>API Key</label>
+                <input 
+                  v-model="openaiApiKey" 
+                  type="password" 
+                  class="config-input"
+                  placeholder="sk-..."
+                />
+              </div>
+              <div class="config-row">
+                <label>聊天模型</label>
+                <input 
+                  v-model="openaiChatModel" 
+                  type="text" 
+                  class="config-input"
+                  placeholder="gpt-4o-mini"
+                />
+              </div>
+              <div class="config-row">
+                <label>嵌入模型</label>
+                <input 
+                  v-model="openaiEmbeddingModel" 
+                  type="text" 
+                  class="config-input"
+                  placeholder="text-embedding-3-small"
+                />
+              </div>
+              <p class="hint">云端 API，效果更好，需要联网和 API Key</p>
+            </div>
+          </div>
+          
           <div class="setting-group">
             <label>注视鼠标</label>
             <div class="toggle-container">
@@ -191,6 +291,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
+import { saveProviderConfig } from '../lib/chatService';
 
 const props = defineProps<{
   visible: boolean;
@@ -242,6 +343,17 @@ const memoryCount = ref(0);
 const windowWidth = ref(500);
 const windowHeight = ref(800);
 
+const aiProviderType = ref<'ollama' | 'openai'>('ollama');
+const ollamaApiUrl = ref('http://localhost:11434');
+const ollamaChatModel = ref('qwen3.5:9b');
+const ollamaEmbeddingModel = ref('nomic-embed-text-v2-moe:latest');
+const openaiApiUrl = ref('https://api.openai.com/v1');
+const openaiApiKey = ref('');
+const openaiChatModel = ref('gpt-4o-mini');
+const openaiEmbeddingModel = ref('text-embedding-3-small');
+const ollamaAvailable = ref(false);
+const openaiAvailable = ref(false);
+
 const loadMemoryCount = async () => {
   if (window.electronAPI?.memory) {
     try {
@@ -251,6 +363,42 @@ const loadMemoryCount = async () => {
       console.warn('[Settings] 获取记忆统计失败:', error);
     }
   }
+};
+
+const loadAIConfig = () => {
+  const saved = localStorage.getItem('aiProviderConfig');
+  if (saved) {
+    try {
+      const config = JSON.parse(saved);
+      aiProviderType.value = config.type || 'ollama';
+      if (config.type === 'ollama') {
+        ollamaApiUrl.value = config.apiUrl || 'http://localhost:11434';
+        ollamaChatModel.value = config.chatModel || 'qwen3.5:9b';
+        ollamaEmbeddingModel.value = config.embeddingModel || 'nomic-embed-text-v2-moe:latest';
+      } else if (config.type === 'openai') {
+        openaiApiUrl.value = config.apiUrl || 'https://api.openai.com/v1';
+        openaiApiKey.value = config.apiKey || '';
+        openaiChatModel.value = config.chatModel || 'gpt-4o-mini';
+        openaiEmbeddingModel.value = config.embeddingModel || 'text-embedding-3-small';
+      }
+    } catch (error) {
+      console.warn('[Settings] 加载 AI 配置失败:', error);
+    }
+  }
+};
+
+const checkProviderAvailability = async () => {
+  try {
+    const response = await fetch('http://localhost:11434/api/tags', {
+      method: 'GET',
+      signal: AbortSignal.timeout(3000)
+    });
+    ollamaAvailable.value = response.ok;
+  } catch {
+    ollamaAvailable.value = false;
+  }
+  
+  openaiAvailable.value = !!openaiApiKey.value;
 };
 
 watch(() => props.visible, (visible) => {
@@ -266,7 +414,13 @@ watch(() => props.visible, (visible) => {
     windowWidth.value = props.currentWindowWidth || 500;
     windowHeight.value = props.currentWindowHeight || 800;
     loadMemoryCount();
+    loadAIConfig();
+    checkProviderAvailability();
   }
+});
+
+watch(openaiApiKey, (newKey) => {
+  openaiAvailable.value = !!newKey;
 });
 
 onMounted(() => {
@@ -316,6 +470,21 @@ const clearMemories = async () => {
 const saveSettings = () => {
   const clampedWidth = Math.max(300, Math.min(800, windowWidth.value || 500));
   const clampedHeight = Math.max(500, Math.min(1200, windowHeight.value || 800));
+  
+  const aiConfig = aiProviderType.value === 'ollama' ? {
+    type: 'ollama' as const,
+    apiUrl: ollamaApiUrl.value,
+    chatModel: ollamaChatModel.value,
+    embeddingModel: ollamaEmbeddingModel.value
+  } : {
+    type: 'openai' as const,
+    apiUrl: openaiApiUrl.value,
+    apiKey: openaiApiKey.value,
+    chatModel: openaiChatModel.value,
+    embeddingModel: openaiEmbeddingModel.value
+  };
+  
+  saveProviderConfig(aiConfig);
   
   emit('save', {
     path: modelPath.value,
@@ -884,6 +1053,115 @@ const saveSettings = () => {
 .memory-count {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.75);
+}
+
+.ai-provider-section {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.provider-type-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.provider-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.provider-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.provider-btn.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+}
+
+.provider-icon {
+  font-size: 24px;
+}
+
+.provider-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.provider-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.provider-status.available {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.provider-config {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.config-row:last-child {
+  margin-bottom: 0;
+}
+
+.config-row label {
+  min-width: 70px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.config-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.config-input:focus {
+  outline: none;
+  border-color: rgba(102, 126, 234, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.config-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .panel-fade-enter-active,

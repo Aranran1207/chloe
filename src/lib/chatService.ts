@@ -1,3 +1,10 @@
+import { createProvider, AIProvider, AIProviderConfig, ChatMessage as AIChatMessage, ProviderType } from './ai';
+import { memoryClient } from './memory/memoryClient';
+import { memoryIntegrator } from './memory/memoryIntegrator';
+import { memoryExtractor } from './memory/memoryExtractor';
+import { embeddingService } from './memory/embeddingService';
+import type { Memory } from './memory/memoryTypes';
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -8,13 +15,78 @@ export interface MotionTrigger {
   position: number;
 }
 
-import { memoryClient } from './memory/memoryClient';
-import { memoryIntegrator } from './memory/memoryIntegrator';
-import { memoryExtractor } from './memory/memoryExtractor';
-import type { Memory } from './memory/memoryTypes';
+export interface AIProviderSettings {
+  type: ProviderType;
+  apiUrl: string;
+  apiKey?: string;
+  chatModel: string;
+  embeddingModel?: string;
+}
 
-const OLLAMA_API_URL = 'http://localhost:11434';
-const OLLAMA_MODEL = 'qwen3.5:9b';
+let currentProvider: AIProvider | null = null;
+let currentConfig: AIProviderSettings | null = null;
+
+export function getProvider(): AIProvider {
+  if (!currentProvider || !currentConfig) {
+    currentConfig = loadProviderConfig();
+    currentProvider = createProvider({
+      type: currentConfig.type,
+      apiUrl: currentConfig.apiUrl,
+      apiKey: currentConfig.apiKey,
+      chatModel: currentConfig.chatModel,
+      embeddingModel: currentConfig.embeddingModel
+    });
+  }
+  return currentProvider;
+}
+
+export function setProviderConfig(config: AIProviderSettings): void {
+  currentConfig = config;
+  currentProvider = createProvider({
+    type: config.type,
+    apiUrl: config.apiUrl,
+    apiKey: config.apiKey,
+    chatModel: config.chatModel,
+    embeddingModel: config.embeddingModel
+  });
+  
+  embeddingService.setConfig({
+    type: config.type,
+    apiUrl: config.apiUrl,
+    apiKey: config.apiKey,
+    embeddingModel: config.embeddingModel || 
+      (config.type === 'openai' ? 'text-embedding-3-small' : 'nomic-embed-text-v2-moe:latest')
+  });
+  
+  console.log(`[AI] 已切换到 ${config.type} Provider，模型: ${config.chatModel}`);
+}
+
+function loadProviderConfig(): AIProviderSettings {
+  const saved = localStorage.getItem('aiProviderConfig');
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+  }
+  
+  return {
+    type: 'ollama',
+    apiUrl: 'http://localhost:11434',
+    chatModel: 'qwen3.5:9b',
+    embeddingModel: 'nomic-embed-text-v2-moe:latest'
+  };
+}
+
+export function saveProviderConfig(config: AIProviderSettings): void {
+  localStorage.setItem('aiProviderConfig', JSON.stringify(config));
+  setProviderConfig(config);
+}
+
+export function getCurrentConfig(): AIProviderSettings | null {
+  return currentConfig;
+}
 
 const buildDefaultPrompt = (name: string, modelName?: string, availableMotions?: string, memories?: Memory[]): string => {
   const displayName = name || modelName || 'Chloe';
@@ -40,11 +112,6 @@ const buildDefaultPrompt = (name: string, modelName?: string, availableMotions?:
   }
   
   return prompt;
-};
-
-const OLLAMA_OPTIONS = {
-  num_ctx: 4096,
-  keep_alive: "1m"
 };
 
 async function getRelevantMemories(message: string): Promise<Memory[]> {
@@ -138,60 +205,40 @@ export async function sendMessage(
   availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
+  const provider = getProvider();
+  const config = currentConfig || loadProviderConfig();
   const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions);
   
-  console.log('[Ollama] 发送请求:', {
-    model: OLLAMA_MODEL,
+  console.log(`[${provider.name}] 发送请求:`, {
+    model: config.chatModel,
     message: message,
     timestamp: new Date().toISOString()
   });
 
   try {
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: prompt
-          },
-          {
-            role: 'user',
-            content: message
-          }
-        ],
-        stream: false,
-        think: false,
-        options: OLLAMA_OPTIONS
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const messages: AIChatMessage[] = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: message }
+    ];
+    
+    const response = await provider.chat(messages);
     const endTime = performance.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     
-    console.log('[Ollama] 响应成功:', {
-      content: data.message?.content,
+    console.log(`[${provider.name}] 响应成功:`, {
+      content: response.content,
       duration: `${duration}s`
     });
 
-    return data.message?.content || '抱歉，我没听懂呢~';
+    return response.content || '抱歉，我没听懂呢~';
   } catch (error) {
     const endTime = performance.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.error('[Ollama] 调用失败:', {
+    console.error(`[${provider.name}] 调用失败:`, {
       error: error,
       duration: `${duration}s`
     });
-    return '哎呀，连接出现问题了，请检查Ollama是否正在运行~';
+    return `哎呀，连接出现问题了，请检查${provider.name}服务是否正常运行~`;
   }
 }
 
@@ -204,6 +251,8 @@ export async function sendMessageStream(
   availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
+  const provider = getProvider();
+  const config = currentConfig || loadProviderConfig();
   
   const memories = await getRelevantMemories(message);
   if (memories.length > 0) {
@@ -212,105 +261,51 @@ export async function sendMessageStream(
   
   const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions, memories);
   
-  console.log('[Ollama] 发送流式请求:', {
-    model: OLLAMA_MODEL,
+  console.log(`[${provider.name}] 发送流式请求:`, {
+    model: config.chatModel,
     message: message,
     memoriesCount: memories.length,
     timestamp: new Date().toISOString()
   });
 
   try {
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const messages: AIChatMessage[] = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: message }
+    ];
+    
+    const fullContent = await provider.chatStream(messages, {
+      onToken,
+      onComplete: (content) => {
+        const endTime = performance.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
+        
+        console.log('\n========================================');
+        console.log('[聊天记录]');
+        console.log('========================================');
+        console.log(`[用户] ${message}`);
+        console.log('----------------------------------------');
+        console.log(`[AI] ${content}`);
+        console.log('========================================');
+        console.log(`[统计] 耗时: ${duration}s | 速度: ${(content.length / ((endTime - startTime) / 1000)).toFixed(1)} 字符/秒`);
+        console.log('========================================\n');
+        
+        extractAndSaveMemory(message, content);
       },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: prompt
-          },
-          {
-            role: 'user',
-            content: message
-          }
-        ],
-        stream: true,
-        think: false,
-        options: OLLAMA_OPTIONS
-      })
+      onError: (error) => {
+        console.error(`[${provider.name}] 流式错误:`, error);
+      }
     });
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('无法获取响应流');
-    }
-
-    const decoder = new TextDecoder();
-    let fullContent = '';
-    let firstTokenTime: number | null = null;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) {
-        break;
-      }
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n').filter(line => line.trim());
-
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line);
-          
-          if (data.message?.content) {
-            if (!firstTokenTime) {
-              firstTokenTime = performance.now();
-            }
-            
-            const token = data.message.content;
-            fullContent += token;
-            onToken(token);
-          }
-          
-          if (data.done) {
-            const endTime = performance.now();
-            const duration = ((endTime - startTime) / 1000).toFixed(2);
-            
-            console.log('\n========================================');
-            console.log('[聊天记录]');
-            console.log('========================================');
-            console.log(`[用户] ${message}`);
-            console.log('----------------------------------------');
-            console.log(`[AI] ${fullContent}`);
-            console.log('========================================');
-            console.log(`[统计] 耗时: ${duration}s | 速度: ${(fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)} 字符/秒`);
-            console.log('========================================\n');
-            
-            extractAndSaveMemory(message, fullContent);
-          }
-        } catch (e) {
-          // 静默处理解析错误
-        }
-      }
-    }
 
     return fullContent || '抱歉，我没听懂呢~';
   } catch (error) {
     const endTime = performance.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.error('[Ollama] 流式调用失败:', {
+    console.error(`[${provider.name}] 流式调用失败:`, {
       error: error,
       duration: `${duration}s`
     });
-    return '哎呀，连接出现问题了，请检查Ollama是否正在运行~';
+    return `哎呀，连接出现问题了，请检查${provider.name}服务是否正常运行~`;
   }
 }
 
@@ -323,67 +318,45 @@ export async function sendMessageWithHistory(
   availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
+  const provider = getProvider();
+  const config = currentConfig || loadProviderConfig();
   const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions);
   
-  console.log('[Ollama] 发送请求(带历史):', {
-    model: OLLAMA_MODEL,
+  console.log(`[${provider.name}] 发送请求(带历史):`, {
+    model: config.chatModel,
     message: message,
     historyLength: history.length,
     timestamp: new Date().toISOString()
   });
 
   try {
-    const messages = [
-      {
-        role: 'system',
-        content: prompt
-      },
+    const messages: AIChatMessage[] = [
+      { role: 'system', content: prompt },
       ...history.map(msg => ({
-        role: msg.role,
+        role: msg.role as 'user' | 'assistant',
         content: msg.content
       })),
-      {
-        role: 'user',
-        content: message
-      }
+      { role: 'user', content: message }
     ];
 
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: messages,
-        stream: false,
-        think: false,
-        options: OLLAMA_OPTIONS
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const response = await provider.chat(messages);
     const endTime = performance.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     
-    console.log('[Ollama] 响应成功(带历史):', {
-      content: data.message?.content,
+    console.log(`[${provider.name}] 响应成功(带历史):`, {
+      content: response.content,
       duration: `${duration}s`
     });
 
-    return data.message?.content || '抱歉，我没听懂呢~';
+    return response.content || '抱歉，我没听懂呢~';
   } catch (error) {
     const endTime = performance.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.error('[Ollama] 调用失败(带历史):', {
+    console.error(`[${provider.name}] 调用失败(带历史):`, {
       error: error,
       duration: `${duration}s`
     });
-    return '哎呀，连接出现问题了，请检查Ollama是否正在运行~';
+    return `哎呀，连接出现问题了，请检查${provider.name}服务是否正常运行~`;
   }
 }
 
@@ -397,115 +370,94 @@ export async function sendMessageWithHistoryStream(
   availableMotions?: string
 ): Promise<string> {
   const startTime = performance.now();
+  const provider = getProvider();
+  const config = currentConfig || loadProviderConfig();
   const prompt = systemPrompt || buildDefaultPrompt(girlfriendName || '', modelName, availableMotions);
   
-  console.log('[Ollama] 发送流式请求(带历史):', {
-    model: OLLAMA_MODEL,
+  console.log(`[${provider.name}] 发送流式请求(带历史):`, {
+    model: config.chatModel,
     message: message,
     historyLength: history.length,
     timestamp: new Date().toISOString()
   });
 
   try {
-    const messages = [
-      {
-        role: 'system',
-        content: prompt
-      },
+    const messages: AIChatMessage[] = [
+      { role: 'system', content: prompt },
       ...history.map(msg => ({
-        role: msg.role,
+        role: msg.role as 'user' | 'assistant',
         content: msg.content
       })),
-      {
-        role: 'user',
-        content: message
-      }
+      { role: 'user', content: message }
     ];
 
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const fullContent = await provider.chatStream(messages, {
+      onToken,
+      onComplete: (content) => {
+        const endTime = performance.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
+        
+        console.log('\n========================================');
+        console.log('[聊天记录 (带历史)]');
+        console.log('========================================');
+        history.forEach((msg) => {
+          const role = msg.role === 'user' ? '用户' : 'AI';
+          console.log(`[${role}] ${msg.content}`);
+          console.log('----------------------------------------');
+        });
+        console.log(`[用户] ${message}`);
+        console.log('----------------------------------------');
+        console.log(`[AI] ${content}`);
+        console.log('========================================');
+        console.log(`[统计] 耗时: ${duration}s | 速度: ${(content.length / ((endTime - startTime) / 1000)).toFixed(1)} 字符/秒 | 历史轮数: ${history.length}`);
+        console.log('========================================\n');
       },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: messages,
-        stream: true,
-        think: false,
-        options: OLLAMA_OPTIONS
-      })
+      onError: (error) => {
+        console.error(`[${provider.name}] 流式错误:`, error);
+      }
     });
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('无法获取响应流');
-    }
-
-    const decoder = new TextDecoder();
-    let fullContent = '';
-    let firstTokenTime: number | null = null;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) {
-        break;
-      }
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n').filter(line => line.trim());
-
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line);
-          
-          if (data.message?.content) {
-            if (!firstTokenTime) {
-              firstTokenTime = performance.now();
-            }
-            
-            const token = data.message.content;
-            fullContent += token;
-            onToken(token);
-          }
-          
-          if (data.done) {
-            const endTime = performance.now();
-            const duration = ((endTime - startTime) / 1000).toFixed(2);
-            
-            console.log('\n========================================');
-            console.log('[聊天记录 (带历史)]');
-            console.log('========================================');
-            history.forEach((msg, idx) => {
-              const role = msg.role === 'user' ? '用户' : 'AI';
-              console.log(`[${role}] ${msg.content}`);
-              console.log('----------------------------------------');
-            });
-            console.log(`[用户] ${message}`);
-            console.log('----------------------------------------');
-            console.log(`[AI] ${fullContent}`);
-            console.log('========================================');
-            console.log(`[统计] 耗时: ${duration}s | 速度: ${(fullContent.length / ((endTime - startTime) / 1000)).toFixed(1)} 字符/秒 | 历史轮数: ${history.length}`);
-            console.log('========================================\n');
-          }
-        } catch (e) {
-          // 静默处理解析错误
-        }
-      }
-    }
 
     return fullContent || '抱歉，我没听懂呢~';
   } catch (error) {
     const endTime = performance.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.error('[Ollama] 流式调用失败(带历史):', {
+    console.error(`[${provider.name}] 流式调用失败(带历史):`, {
       error: error,
       duration: `${duration}s`
     });
-    return '哎呀，连接出现问题了，请检查Ollama是否正在运行~';
+    return `哎呀，连接出现问题了，请检查${provider.name}服务是否正常运行~`;
   }
+}
+
+export async function checkProviderAvailability(): Promise<{ type: ProviderType; available: boolean }[]> {
+  const results: { type: ProviderType; available: boolean }[] = [];
+  
+  const ollamaConfig: AIProviderConfig = {
+    type: 'ollama',
+    apiUrl: 'http://localhost:11434',
+    chatModel: 'qwen3.5:9b'
+  };
+  
+  const openaiConfig: AIProviderConfig = {
+    type: 'openai',
+    apiUrl: 'https://api.openai.com/v1',
+    apiKey: currentConfig?.apiKey || '',
+    chatModel: 'gpt-4o-mini'
+  };
+  
+  try {
+    const ollamaProvider = createProvider(ollamaConfig);
+    results.push({ type: 'ollama', available: await ollamaProvider.isAvailable() });
+  } catch {
+    results.push({ type: 'ollama', available: false });
+  }
+  
+  try {
+    const openaiProvider = createProvider(openaiConfig);
+    results.push({ type: 'openai', available: await openaiProvider.isAvailable() });
+  } catch {
+    results.push({ type: 'openai', available: false });
+  }
+  
+  return results;
 }
