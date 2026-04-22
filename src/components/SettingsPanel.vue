@@ -388,14 +388,31 @@ const loadAIConfig = () => {
 };
 
 const checkProviderAvailability = async () => {
+  const saved = localStorage.getItem('aiProviderConfig');
+  let ollamaUrl = 'http://localhost:11434';
+  
+  if (saved) {
+    try {
+      const config = JSON.parse(saved);
+      if (config.type === 'ollama' && config.apiUrl) {
+        ollamaUrl = config.apiUrl;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  
   try {
-    const response = await fetch('http://localhost:11434/api/tags', {
+    console.log('[Settings] 检查 Ollama 可用性:', ollamaUrl);
+    const response = await fetch(`${ollamaUrl}/api/tags`, {
       method: 'GET',
       signal: AbortSignal.timeout(3000)
     });
     ollamaAvailable.value = response.ok;
+    console.log('[Settings] Ollama 可用:', response.ok);
   } catch {
     ollamaAvailable.value = false;
+    console.log('[Settings] Ollama 不可用');
   }
   
   openaiAvailable.value = !!openaiApiKey.value;

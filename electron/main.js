@@ -20,7 +20,14 @@ let config = {
   systemPrompt: '',
   girlfriendName: '',
   windowWidth: 500,
-  windowHeight: 800
+  windowHeight: 800,
+  aiProvider: {
+    type: 'ollama',
+    apiUrl: 'http://localhost:11434',
+    apiKey: '',
+    chatModel: 'qwen3.5:9b',
+    embeddingModel: 'nomic-embed-text-v2-moe:latest'
+  }
 };
 
 const MIN_WINDOW_WIDTH = 300;
@@ -141,7 +148,7 @@ function createWindow() {
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:12070');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
@@ -186,13 +193,22 @@ ipcMain.handle('get-window-position', () => {
 });
 
 ipcMain.on('set-window-position', (event, { x, y }) => {
-  const [width, height] = mainWindow.getSize();
-  mainWindow.setBounds({
-    x: Math.round(x),
-    y: Math.round(y),
-    width: width,
-    height: height
-  });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    // 获取当前尺寸并强制保持
+    const [currentW, currentH] = mainWindow.getSize();
+    
+    // 先设置尺寸（确保尺寸正确）
+    mainWindow.setSize(currentW, currentH);
+    
+    // 再设置位置
+    mainWindow.setPosition(Math.round(x), Math.round(y));
+    
+    // 再次检查并恢复尺寸（双重保险）
+    const [newW, newH] = mainWindow.getSize();
+    if (newW !== currentW || newH !== currentH) {
+      mainWindow.setSize(currentW, currentH);
+    }
+  }
 });
 
 ipcMain.handle('get-window-size', () => {

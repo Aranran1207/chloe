@@ -61,40 +61,62 @@ export class OllamaProvider implements AIProvider {
     config?: Partial<AIProviderConfig>
   ): Promise<string> {
     const effectiveConfig = { ...this.config, ...config };
+    const url = `${effectiveConfig.apiUrl}/api/chat`;
+    const body = {
+      model: effectiveConfig.chatModel,
+      messages,
+      stream: true,
+      options: {
+        num_ctx: effectiveConfig.maxTokens || 4096,
+        temperature: effectiveConfig.temperature || 0.8,
+        think: false
+      }
+    };
     
-    const response = await fetch(`${effectiveConfig.apiUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: effectiveConfig.chatModel,
-        messages,
-        stream: true,
-        options: {
-          num_ctx: effectiveConfig.maxTokens || 4096,
-          temperature: effectiveConfig.temperature || 0.8,
-          think: false
-        }
-      })
-    });
+    console.log('[Ollama] 请求 URL:', url);
+    console.log('[Ollama] 请求 Body:', JSON.stringify(body, null, 2));
+    
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      console.log('[Ollama] 响应状态:', response.status, response.statusText);
+    } catch (fetchError) {
+      console.error('[Ollama] Fetch 错误:', fetchError);
+      callbacks.onError?.(fetchError as Error);
+      throw fetchError;
+    }
 
     if (!response.ok) {
-      const error = new Error(`Ollama API error: ${response.status}`);
+      const errorText = await response.text().catch(() => '');
+      console.error('[Ollama] 响应错误:', response.status, errorText);
+      const error = new Error(`Ollama API error: ${response.status} - ${errorText}`);
       callbacks.onError?.(error);
       throw error;
     }
 
+    console.log('[Ollama] 开始读取流...');
     const reader = response.body?.getReader();
     if (!reader) {
+      console.error('[Ollama] 无法获取 reader');
       throw new Error('No response body');
     }
 
     const decoder = new TextDecoder();
     let fullContent = '';
+    let chunkCount = 0;
 
     try {
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('[Ollama] 流读取完成，共', chunkCount, '个 chunk');
+          break;
+        }
+        chunkCount++;
 
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split('\n').filter(line => line.trim());
@@ -107,16 +129,21 @@ export class OllamaProvider implements AIProvider {
               fullContent += token;
               callbacks.onToken(token);
             }
+            if (data.done) {
+              console.log('[Ollama] Ollama 报告完成');
+            }
           } catch {
             // Skip invalid JSON
           }
         }
       }
     } catch (error) {
+      console.error('[Ollama] 流读取错误:', error);
       callbacks.onError?.(error as Error);
       throw error;
     }
 
+    console.log('[Ollama] 完整响应长度:', fullContent.length);
     callbacks.onComplete?.(fullContent);
     return fullContent;
   }

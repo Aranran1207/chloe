@@ -1,11 +1,35 @@
 <template>
-  <div id="app-container">
-    <Live2DView />
+  <div id="app-container" :style="{ width: containerWidth + 'px', height: containerHeight + 'px' }">
+    <Live2DView 
+      @window-size-change="handleWindowSizeChange"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
 import Live2DView from './components/Live2DView.vue';
+
+const containerWidth = ref(500);
+const containerHeight = ref(800);
+
+const handleWindowSizeChange = (width: number, height: number) => {
+  containerWidth.value = width;
+  containerHeight.value = height;
+};
+
+onMounted(() => {
+  const saved = localStorage.getItem('chloeWindowSize');
+  if (saved) {
+    try {
+      const { width, height } = JSON.parse(saved);
+      containerWidth.value = width;
+      containerHeight.value = height;
+    } catch {
+      // ignore
+    }
+  }
+});
 </script>
 
 <style>
@@ -16,20 +40,15 @@ import Live2DView from './components/Live2DView.vue';
 }
 
 html, body {
-  width: 500px;
-  height: 800px;
   overflow: hidden;
 }
 
 #app-container {
-  width: 500px !important;
-  height: 800px !important;
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: auto !important;
-  bottom: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 </style>

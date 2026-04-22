@@ -1,4 +1,4 @@
-import { createProvider, AIProviderConfig, ProviderType } from '../ai';
+import { ProviderType } from '../ai';
 
 interface EmbeddingConfig {
   type: ProviderType;
@@ -52,6 +52,15 @@ export class EmbeddingService {
     if (saved) {
       try {
         const config = JSON.parse(saved);
+        if (config.type === 'openai' && !config.apiKey) {
+          console.warn('[EmbeddingService] OpenAI 配置缺少 API Key，回退到 Ollama');
+          this._config = {
+            type: 'ollama',
+            apiUrl: config.apiUrl || 'http://localhost:11434',
+            embeddingModel: config.embeddingModel || 'nomic-embed-text-v2-moe:latest'
+          };
+          return this._config;
+        }
         this._config = {
           type: config.type || 'ollama',
           apiUrl: config.apiUrl || 'http://localhost:11434',
@@ -102,15 +111,21 @@ export class EmbeddingService {
   }
 
   private async getOllamaEmbedding(text: string, config: EmbeddingConfig): Promise<number[]> {
-    const response = await fetch(`${config.apiUrl}/api/embeddings`, {
+    const url = `${config.apiUrl}/api/embeddings`;
+    const body = {
+      model: config.embeddingModel,
+      prompt: text
+    };
+    
+    console.log('[Embedding-Ollama] 请求 URL:', url);
+    console.log('[Embedding-Ollama] 请求 Body:', JSON.stringify(body, null, 2));
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: config.embeddingModel,
-        prompt: text
-      })
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {
@@ -118,10 +133,17 @@ export class EmbeddingService {
     }
 
     const data = await response.json();
+    console.log('[Embedding-Ollama] 响应成功，向量维度:', data.embedding?.length);
     return data.embedding as number[];
   }
 
   private async getOpenAIEmbedding(text: string, config: EmbeddingConfig): Promise<number[]> {
+    const url = `${config.apiUrl}/embeddings`;
+    const body = {
+      model: config.embeddingModel,
+      input: text
+    };
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
@@ -129,14 +151,15 @@ export class EmbeddingService {
     if (config.apiKey) {
       headers['Authorization'] = `Bearer ${config.apiKey}`;
     }
+    
+    console.log('[Embedding-OpenAI] 请求 URL:', url);
+    console.log('[Embedding-OpenAI] 请求 Body:', JSON.stringify(body, null, 2));
+    console.log('[Embedding-OpenAI] API Key:', config.apiKey ? `${config.apiKey.substring(0, 10)}...` : '未配置');
 
-    const response = await fetch(`${config.apiUrl}/embeddings`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        model: config.embeddingModel,
-        input: text
-      })
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {
@@ -147,6 +170,7 @@ export class EmbeddingService {
     }
 
     const data = await response.json();
+    console.log('[Embedding-OpenAI] 响应成功，向量维度:', data.data?.[0]?.embedding?.length);
     return data.data?.[0]?.embedding || [];
   }
 

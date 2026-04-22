@@ -8,7 +8,7 @@
     "build": "vite build",
     "type-check": "vue-tsc --noEmit",
     "preview": "vite preview",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:12070 && electron .\"",
     "electron:build": "npm run build && electron-builder",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "preinstall": "node -e \"process.env.ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'; process.env.ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder-binaries/'\"",

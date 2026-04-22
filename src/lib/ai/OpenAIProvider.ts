@@ -73,17 +73,23 @@ export class OpenAIProvider implements AIProvider {
     config?: Partial<AIProviderConfig>
   ): Promise<string> {
     const effectiveConfig = { ...this.config, ...config };
+    const url = `${effectiveConfig.apiUrl}/chat/completions`;
+    const body = {
+      model: effectiveConfig.chatModel,
+      messages,
+      temperature: effectiveConfig.temperature || 0.8,
+      max_tokens: effectiveConfig.maxTokens,
+      stream: true
+    };
     
-    const response = await fetch(`${effectiveConfig.apiUrl}/chat/completions`, {
+    console.log('[OpenAI] 请求 URL:', url);
+    console.log('[OpenAI] 请求 Body:', JSON.stringify(body, null, 2));
+    console.log('[OpenAI] API Key:', effectiveConfig.apiKey ? `${effectiveConfig.apiKey.substring(0, 10)}...` : '未配置');
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: this.getHeaders(effectiveConfig),
-      body: JSON.stringify({
-        model: effectiveConfig.chatModel,
-        messages,
-        temperature: effectiveConfig.temperature || 0.8,
-        max_tokens: effectiveConfig.maxTokens,
-        stream: true
-      })
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {

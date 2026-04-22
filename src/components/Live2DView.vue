@@ -143,6 +143,10 @@ import ChatBubble from './ChatBubble.vue';
 import ChatInput from './ChatInput.vue';
 import ThinkingBubble from './ThinkingBubble.vue';
 
+const emit = defineEmits<{
+  (e: 'window-size-change', width: number, height: number): void;
+}>();
+
 interface ModelInfo {
   name: string;
   path: string;
@@ -224,28 +228,35 @@ const handleProactiveQuestion = async (question: string) => {
   isStreaming.value = false;
 };
 
-// 修复：Canvas 尺寸绑定到容器（不是document），避免窗口变大
+// 修复：Canvas 尺寸使用固定值，避免亚像素偏移导致容器不断扩张
 const resizeCanvas = () => {
   if (!canvasRef.value || !containerRef.value) return;
   
   const dpr = window.devicePixelRatio || 1;
-  const { clientWidth, clientHeight } = containerRef.value;
+  const w = windowWidth.value;
+  const h = windowHeight.value;
 
-  if (canvasRef.value.width === clientWidth * dpr && canvasRef.value.height === clientHeight * dpr) {
+  if (canvasRef.value.width === w * dpr && canvasRef.value.height === h * dpr) {
     return;
   }
 
-  canvasRef.value.width = clientWidth * dpr;
-  canvasRef.value.height = clientHeight * dpr;
+  canvasRef.value.width = w * dpr;
+  canvasRef.value.height = h * dpr;
   
-  canvasRef.value.style.width = `${clientWidth}px`;
-  canvasRef.value.style.height = `${clientHeight}px`;
+  canvasRef.value.style.width = `${w}px`;
+  canvasRef.value.style.height = `${h}px`;
 };
 
 const handleMouseDown = (e: MouseEvent) => {
   if (e.button === 0 && (showMenu.value || showModelMenu.value)) {
     showMenu.value = false;
     showModelMenu.value = false;
+    return;
+  }
+  
+  const target = e.target as HTMLElement;
+  const isInteractiveElement = target.closest('.chat-input-overlay, .settings-overlay, .memory-panel-overlay, .context-menu, .model-menu, input, button, textarea');
+  if (isInteractiveElement) {
     return;
   }
   
@@ -286,7 +297,10 @@ const handleMouseMove = (e: MouseEvent) => {
     const offsetY = e.screenY - startY;
     const newWinX = winStartX + offsetX;
     const newWinY = winStartY + offsetY;
-    window.electronAPI.setWindowPosition(newWinX, newWinY);
+    
+    requestAnimationFrame(() => {
+      window.electronAPI.setWindowPosition(newWinX, newWinY);
+    });
   }
 };
 
@@ -507,6 +521,14 @@ const handleSaveSettings = async (settings: {
   if (settings.windowWidth !== windowWidth.value || settings.windowHeight !== windowHeight.value) {
     windowWidth.value = settings.windowWidth;
     windowHeight.value = settings.windowHeight;
+    
+    // 通知 App.vue 窗口尺寸变化
+    emit('window-size-change', windowWidth.value, windowHeight.value);
+    localStorage.setItem('chloeWindowSize', JSON.stringify({ 
+      width: windowWidth.value, 
+      height: windowHeight.value 
+    }));
+    
     if (window.electronAPI?.setWindowSize) {
       window.electronAPI.setWindowSize(settings.windowWidth, settings.windowHeight);
     }
@@ -615,6 +637,22 @@ const loadConfig = async () => {
     if (config.windowHeight !== undefined) {
       windowHeight.value = config.windowHeight;
     }
+    
+    // 通知 App.vue 窗口尺寸
+    emit('window-size-change', windowWidth.value, windowHeight.value);
+    localStorage.setItem('chloeWindowSize', JSON.stringify({ 
+      width: windowWidth.value, 
+      height: windowHeight.value 
+    }));
+    
+    if (config.aiProvider) {
+      const savedLocalStorage = localStorage.getItem('aiProviderConfig');
+      if (!savedLocalStorage) {
+        localStorage.setItem('aiProviderConfig', JSON.stringify(config.aiProvider));
+        console.log('[Config] 从配置文件同步 AI Provider 配置:', config.aiProvider.type);
+      }
+    }
+    
     modelList.value = await window.electronAPI.getModelList();
     
     if (config.currentModel && modelList.value.length > 0) {

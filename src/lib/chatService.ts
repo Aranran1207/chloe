@@ -29,6 +29,7 @@ let currentConfig: AIProviderSettings | null = null;
 export function getProvider(): AIProvider {
   if (!currentProvider || !currentConfig) {
     currentConfig = loadProviderConfig();
+    console.log('[AI] 加载配置:', JSON.stringify(currentConfig, null, 2));
     currentProvider = createProvider({
       type: currentConfig.type,
       apiUrl: currentConfig.apiUrl,
@@ -58,6 +59,14 @@ export function setProviderConfig(config: AIProviderSettings): void {
       (config.type === 'openai' ? 'text-embedding-3-small' : 'nomic-embed-text-v2-moe:latest')
   });
   
+  // 同步配置到 memoryExtractor
+  memoryExtractor.setConfig({
+    type: config.type,
+    apiUrl: config.apiUrl,
+    apiKey: config.apiKey,
+    chatModel: config.chatModel
+  });
+  
   console.log(`[AI] 已切换到 ${config.type} Provider，模型: ${config.chatModel}`);
 }
 
@@ -65,7 +74,17 @@ function loadProviderConfig(): AIProviderSettings {
   const saved = localStorage.getItem('aiProviderConfig');
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const config = JSON.parse(saved);
+      if (config.type === 'openai' && !config.apiKey) {
+        console.warn('[AI] OpenAI 配置缺少 API Key，回退到 Ollama');
+        return {
+          type: 'ollama',
+          apiUrl: config.apiUrl || 'http://localhost:11434',
+          chatModel: config.chatModel || 'qwen3.5:9b',
+          embeddingModel: config.embeddingModel || 'nomic-embed-text-v2-moe:latest'
+        };
+      }
+      return config;
     } catch {
       // ignore
     }

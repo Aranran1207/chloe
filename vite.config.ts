@@ -13,7 +13,7 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173,
+    port: 12070,
     strictPort: true,
     watch: {
       ignored: ['**/config.json']

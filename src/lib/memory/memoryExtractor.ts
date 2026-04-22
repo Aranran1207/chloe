@@ -3,9 +3,6 @@ import {
   ExtractedMemory
 } from './memoryTypes';
 
-const OLLAMA_API_URL = 'http://localhost:11434';
-const OLLAMA_MODEL = 'qwen3.5:9b';
-
 const EXTRACTION_PROMPT = `你是一个记忆提取助手。分析以下对话，从【用户消息】中提取关于用户的新信息。
 
 对话内容：
@@ -51,8 +48,16 @@ const EXTRACTION_PROMPT = `你是一个记忆提取助手。分析以下对话�
 
 只返回JSON，不要有其他内容。`;
 
+interface ExtractorConfig {
+  type: 'ollama' | 'openai';
+  apiUrl: string;
+  apiKey?: string;
+  chatModel: string;
+}
+
 export class MemoryExtractor {
   private static _instance: MemoryExtractor;
+  private _config: ExtractorConfig | null = null;
 
   private constructor() {}
 
@@ -63,43 +68,102 @@ export class MemoryExtractor {
     return MemoryExtractor._instance;
   }
 
+  public setConfig(config: ExtractorConfig): void {
+    this._config = config;
+    console.log('[MemoryExtractor] 配置已更新:', config.apiUrl, config.chatModel);
+  }
+
+  private loadConfig(): ExtractorConfig {
+    if (this._config) {
+      return this._config;
+    }
+
+    const saved = localStorage.getItem('aiProviderConfig');
+    if (saved) {
+      try {
+        const config = JSON.parse(saved);
+        this._config = {
+          type: config.type || 'ollama',
+          apiUrl: config.apiUrl || 'http://localhost:11434',
+          apiKey: config.apiKey,
+          chatModel: config.chatModel || 'qwen3.5:9b'
+        };
+        return this._config;
+      } catch {
+        // ignore
+      }
+    }
+
+    return {
+      type: 'ollama',
+      apiUrl: 'http://localhost:11434',
+      chatModel: 'qwen3.5:9b'
+    };
+  }
+
+  private getHeaders(config: ExtractorConfig): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    }
+    return headers;
+  }
+
   public async extractFromConversation(
     userMessage: string,
     aiResponse: string
   ): Promise<ExtractedMemory[]> {
     try {
+      const config = this.loadConfig();
       const prompt = EXTRACTION_PROMPT
         .replace('{userMessage}', userMessage)
         .replace('{aiResponse}', aiResponse);
 
-      const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: OLLAMA_MODEL,
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
+      let url: string;
+      let body: any;
+
+      if (config.type === 'openai') {
+        url = `${config.apiUrl}/chat/completions`;
+        body = {
+          model: config.chatModel,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+          max_tokens: 1024
+        };
+      } else {
+        url = `${config.apiUrl}/api/chat`;
+        body = {
+          model: config.chatModel,
+          messages: [{ role: 'user', content: prompt }],
           stream: false,
           think: false,
           options: {
             num_ctx: 2048,
             temperature: 0.1
           }
-        })
+        };
+      }
+
+      console.log('[MemoryExtractor] 请求 URL:', url);
+      console.log('[MemoryExtractor] 请求模型:', config.chatModel);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(config),
+        body: JSON.stringify(body)
       });
 
       if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.status}`);
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      const content = data.message?.content || '';
+      const content = config.type === 'openai' 
+        ? (data.choices?.[0]?.message?.content || '')
+        : (data.message?.content || '');
       
       const memories = this.parseExtractionResult(content);
       
