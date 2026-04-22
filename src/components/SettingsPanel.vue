@@ -406,7 +406,7 @@ const checkProviderAvailability = async () => {
     console.log('[Settings] 检查 Ollama 可用性:', ollamaUrl);
     const response = await fetch(`${ollamaUrl}/api/tags`, {
       method: 'GET',
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(10000)
     });
     ollamaAvailable.value = response.ok;
     console.log('[Settings] Ollama 可用:', response.ok);

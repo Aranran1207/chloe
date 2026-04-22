@@ -646,11 +646,8 @@ const loadConfig = async () => {
     }));
     
     if (config.aiProvider) {
-      const savedLocalStorage = localStorage.getItem('aiProviderConfig');
-      if (!savedLocalStorage) {
-        localStorage.setItem('aiProviderConfig', JSON.stringify(config.aiProvider));
-        console.log('[Config] 从配置文件同步 AI Provider 配置:', config.aiProvider.type);
-      }
+      localStorage.setItem('aiProviderConfig', JSON.stringify(config.aiProvider));
+      console.log('[Config] 从配置文件同步 AI Provider 配置:', config.aiProvider.type);
     }
     
     modelList.value = await window.electronAPI.getModelList();
