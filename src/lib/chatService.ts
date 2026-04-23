@@ -148,10 +148,12 @@ async function getRelevantMemories(message: string): Promise<Memory[]> {
 
 async function extractAndSaveMemory(userMessage: string, aiResponse: string): Promise<void> {
   if (!memoryClient.isAvailable()) {
+    console.log('[Memory] 记忆系统不可用，跳过提取');
     return;
   }
   
   if (!memoryExtractor.shouldExtract(userMessage)) {
+    console.log('[Memory] 消息不包含个人信息关键词，跳过提取');
     return;
   }
   

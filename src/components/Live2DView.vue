@@ -136,6 +136,8 @@ import { ChloeLive2D } from '../lib/chloe';
 import { sendMessageStream, parseMotionTriggers } from '../lib/chatService';
 import { MotionManager } from '../lib/motionManager';
 import { proactiveEngine } from '../lib/memory/proactiveEngine';
+import { memoryExtractor } from '../lib/memory/memoryExtractor';
+import { memoryClient } from '../lib/memory/memoryClient';
 import SettingsPanel from './SettingsPanel.vue';
 import MemoryPanel from './MemoryPanel.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
@@ -765,6 +767,12 @@ onMounted(async () => {
       proactiveEngine.setQuestionCallback(handleProactiveQuestion);
       proactiveEngine.startProactiveMode(30);
       console.log('[Live2DView] 主动提问引擎已启动');
+      
+      // 挂载到 window 对象，方便在控制台中调试
+      (window as any).proactiveEngine = proactiveEngine;
+      (window as any).memoryExtractor = memoryExtractor;
+      (window as any).memoryClient = memoryClient;
+      console.log('[Live2DView] 调试工具已挂载到 window: proactiveEngine, memoryExtractor, memoryClient');
     }
 
     canvasRef.value.addEventListener('click', (e) => {
