@@ -331,6 +331,143 @@ function updateTrayMenu() {
   tray.setContextMenu(contextMenu);
 }
 
+// 原生右键菜单弹出
+ipcMain.on('show-context-menu', (event, { x, y }) => {
+  const isEyeTracking = config.eyeTracking !== false;
+  const isIgnoreMouseEvents = config.ignoreMouseEvents || false;
+  
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: isEyeTracking ? '关闭注视' : '注视鼠标',
+      type: 'checkbox',
+      checked: isEyeTracking,
+      click: () => {
+        config.eyeTracking = !isEyeTracking;
+        saveConfig();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('eye-tracking-changed', !isEyeTracking);
+        }
+      }
+    },
+    {
+      label: isIgnoreMouseEvents ? '关闭穿透' : '鼠标穿透',
+      type: 'checkbox',
+      checked: isIgnoreMouseEvents,
+      click: () => {
+        if (mainWindow) {
+          mainWindow.setIgnoreMouseEvents(!isIgnoreMouseEvents, { forward: true });
+          config.ignoreMouseEvents = !isIgnoreMouseEvents;
+          saveConfig();
+          mainWindow.webContents.send('ignore-mouse-events-changed', !isIgnoreMouseEvents);
+          updateTrayMenu();
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: '切换模型',
+      submenu: buildModelSubmenu()
+    },
+    { type: 'separator' },
+    {
+      label: '设置',
+      click: () => {
+        openSettingsWindow();
+      }
+    },
+    {
+      label: '记忆管理',
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('open-memory-panel');
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: '退出程序',
+      click: () => {
+        if (memoryDb) {
+          memoryDb.close();
+        }
+        app.quit();
+      }
+    }
+  ]);
+  
+  contextMenu.popup({ x: Math.round(x), y: Math.round(y) });
+});
+
+function buildModelSubmenu() {
+  const models = getModelList();
+  if (models.length === 0) {
+    return [{ label: '暂无模型', enabled: false }];
+  }
+  return models.map(m => ({
+    label: m.name,
+    type: 'checkbox',
+    checked: config.currentModel && config.currentModel.name === m.name,
+    click: () => {
+      config.currentModel = m;
+      saveConfig();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('model-changed', m);
+      }
+    }
+  }));
+}
+
+// 设置窗口
+let settingsWindow = null;
+
+function openSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  
+  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+  const winWidth = 500;
+  const winHeight = 700;
+  
+  settingsWindow = new BrowserWindow({
+    width: winWidth,
+    height: winHeight,
+    x: Math.round((screenWidth - winWidth) / 2),
+    y: Math.round((screenHeight - winHeight) / 2),
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    icon: isDev 
+      ? path.join(__dirname, '../src/assets/logo.ico')
+      : path.join(process.resourcesPath, 'assets/logo.ico'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: false
+    }
+  });
+  
+  if (isDev) {
+    settingsWindow.loadURL('http://localhost:12070/#/settings');
+  } else {
+    settingsWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: '/settings' });
+  }
+  
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
+ipcMain.on('close-settings-window', () => {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.close();
+  }
+});
+
 let globalMouseTracking = false;
 
 ipcMain.on('start-global-mouse-tracking', () => {
@@ -379,7 +516,7 @@ ipcMain.handle('open-folder-dialog', async () => {
   return result;
 });
 
-ipcMain.handle('get-model-list', () => {
+function getModelList() {
   const modelList = [];
   try {
     const modelDir = path.resolve(config.modelPath);
@@ -407,6 +544,10 @@ ipcMain.handle('get-model-list', () => {
     console.error('Failed to get model list:', error);
   }
   return modelList;
+}
+
+ipcMain.handle('get-model-list', () => {
+  return getModelList();
 });
 
 // ============ 记忆系统 IPC ============

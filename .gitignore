@@ -28,3 +28,4 @@ out/
 
 # Models
 resources/
+.trae/*

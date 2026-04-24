@@ -27,6 +27,12 @@ interface Window {
     getIgnoreMouseEvents: () => Promise<boolean>;
     setIgnoreMouseEvents: (ignore: boolean) => void;
     onIgnoreMouseEventsChanged: (callback: (ignore: boolean) => void) => void;
+    showContextMenu: (x: number, y: number) => void;
+    closeSettingsWindow: () => void;
+    onEyeTrackingChanged: (callback: (enabled: boolean) => void) => void;
+    onOpenMemoryPanel: (callback: () => void) => void;
+    onModelChanged: (callback: (model: any) => void) => void;
+    onSettingsSaved: (callback: (settings: any) => void) => void;
     memory: {
       add: (memoryData: any) => Promise<any>;
       getAll: () => Promise<any[]>;

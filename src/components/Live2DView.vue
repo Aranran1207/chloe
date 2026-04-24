@@ -25,95 +25,6 @@
       :streamMode="isStreaming"
       @disappear="showBubble = false"
     />
-
-    <Transition name="menu-fade">
-      <div v-if="showMenu" class="context-menu" :style="{ left: menuX + 'px', top: menuY + 'px' }">
-        <div class="menu-item" @click="toggleEyeTracking">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5C17 19.5 21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          <span>{{ eyeTrackingEnabled ? '关闭注视' : '注视鼠标' }}</span>
-          <div v-if="eyeTrackingEnabled" class="status-dot"></div>
-        </div>
-        
-        <div class="menu-item" @click="toggleIgnoreMouseEvents">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
-            <path d="M12 16V12M12 8H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <span>{{ ignoreMouseEvents ? '关闭穿透' : '鼠标穿透' }}</span>
-          <div v-if="ignoreMouseEvents" class="status-dot"></div>
-        </div>
-        
-        <div class="menu-item" @click="showModelSwitcher">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 3H21V8M21 3L14 10M8 21H3V16M3 21L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>切换模型</span>
-          <svg class="menu-arrow" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        
-        <div class="menu-item" @click="openSettings">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          <span>设置</span>
-        </div>
-        
-        <div class="menu-item" @click="openMemoryPanel">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z" stroke="currentColor" stroke-width="2"/>
-            <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          <span>记忆管理</span>
-        </div>
-        
-        <div class="menu-divider"></div>
-        <div class="menu-item menu-item-danger" @click="quitApp">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>退出程序</span>
-        </div>
-      </div>
-    </Transition>
-    
-    <Transition name="menu-fade">
-      <div v-if="showModelMenu" class="context-menu model-menu" :style="{ left: modelMenuX + 'px', top: modelMenuY + 'px' }">
-        <div v-for="model in modelList" :key="model.name" 
-             class="menu-item" 
-             :class="{ 'menu-item-active': currentModel?.name === model.name }"
-             @click="switchModel(model)">
-          <span>{{ model.name }}</span>
-          <div v-if="currentModel?.name === model.name" class="status-dot"></div>
-        </div>
-        <div v-if="modelList.length === 0" class="menu-item menu-item-disabled">
-          <span>暂无模型</span>
-        </div>
-      </div>
-    </Transition>
-    
-    <SettingsPanel 
-      :visible="showSettings" 
-      :currentPath="modelBasePath"
-      :currentScale="modelScale"
-      :currentOffsetX="modelOffsetX"
-      :currentOffsetY="modelOffsetY"
-      :currentBubbleColor="bubbleColor"
-      :currentEyeTracking="eyeTrackingEnabled"
-      :currentSystemPrompt="systemPrompt"
-      :currentGirlfriendName="girlfriendName"
-      :currentWindowWidth="windowWidth"
-      :currentWindowHeight="windowHeight"
-      @close="showSettings = false"
-      @cancel="handleCancelSettings"
-      @save="handleSaveSettings"
-      @updateTransform="handleUpdateTransform"
-    />
     
     <MemoryPanel 
       :visible="showMemoryPanel"
@@ -147,7 +58,6 @@ import { MotionManager } from '../lib/motionManager';
 import { proactiveEngine } from '../lib/memory/proactiveEngine';
 import { memoryExtractor } from '../lib/memory/memoryExtractor';
 import { memoryClient } from '../lib/memory/memoryClient';
-import SettingsPanel from './SettingsPanel.vue';
 import MemoryPanel from './MemoryPanel.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import ChatBubble from './ChatBubble.vue';
@@ -166,14 +76,7 @@ interface ModelInfo {
 
 const containerRef = ref<HTMLDivElement>();
 const canvasRef = ref<HTMLCanvasElement>();
-const showMenu = ref(false);
-const menuX = ref(0);
-const menuY = ref(0);
 const eyeTrackingEnabled = ref(true);
-const showSettings = ref(false);
-const showModelMenu = ref(false);
-const modelMenuX = ref(0);
-const modelMenuY = ref(0);
 const modelBasePath = ref('./resources/');
 const modelList = ref<ModelInfo[]>([]);
 const currentModel = ref<ModelInfo | null>(null);
@@ -260,21 +163,13 @@ const resizeCanvas = () => {
 };
 
 const handleMouseDown = (e: MouseEvent) => {
-  if (e.button === 0 && (showMenu.value || showModelMenu.value)) {
-    showMenu.value = false;
-    showModelMenu.value = false;
-    return;
-  }
-  
   const target = e.target as HTMLElement;
-  const isInteractiveElement = target.closest('.chat-input-overlay, .settings-overlay, .memory-panel-overlay, .context-menu, .model-menu, input, button, textarea');
+  const isInteractiveElement = target.closest('.chat-input-overlay, .memory-panel-overlay, input, button, textarea');
   if (isInteractiveElement) {
     return;
   }
   
   e.preventDefault();
-  showMenu.value = false;
-  showModelMenu.value = false;
   isMouseDown = true;
   isDragging = false;
   hasWindowPosition = false;
@@ -388,80 +283,23 @@ const handleSendMessage = async (message: string) => {
   }
 };
 
-const showContextMenu = (e: MouseEvent) => {
-  const menuWidth = 170;
-  const menuHeight = 240;
-  const padding = 10;
+const showContextMenu = async (e: MouseEvent) => {
+  if (!window.electronAPI) return;
   
-  let x = e.clientX;
-  let y = e.clientY;
+  const [winX, winY] = await window.electronAPI.getWindowPosition();
+  const screenX = winX + e.clientX;
+  const screenY = winY + e.clientY;
   
-  if (x + menuWidth + padding > windowWidth.value) {
-    x = windowWidth.value - menuWidth - padding;
-  }
-  
-  if (y + menuHeight + padding > windowHeight.value) {
-    y = windowHeight.value - menuHeight - padding;
-  }
-  
-  x = Math.max(padding, x);
-  y = Math.max(padding, y);
-  
-  menuX.value = x;
-  menuY.value = y;
-  showMenu.value = true;
-};
-
-const quitApp = () => {
-  showMenu.value = false;
-  showModelMenu.value = false;
-  if (window.electronAPI) {
-    window.electronAPI.quitApp();
-  }
+  window.electronAPI.showContextMenu(screenX, screenY);
 };
 
 const openSettings = () => {
-  showMenu.value = false;
-  showSettings.value = true;
-};
-
-const openMemoryPanel = () => {
-  showMenu.value = false;
-  showMemoryPanel.value = true;
-};
-
-const showModelSwitcher = async () => {
-  showMenu.value = false;
-  
   if (window.electronAPI) {
-    modelList.value = await window.electronAPI.getModelList();
+    window.electronAPI.showContextMenu(0, 0);
   }
-  
-  const modelMenuWidth = 150;
-  const modelMenuHeight = Math.min(modelList.value.length * 40 + 16, 300);
-  const padding = 10;
-  
-  let x = menuX.value + 170;
-  let y = menuY.value - 50;
-  
-  if (x + modelMenuWidth + padding > windowWidth.value) {
-    x = menuX.value - modelMenuWidth - 10;
-  }
-  
-  if (y + modelMenuHeight + padding > windowHeight.value) {
-    y = windowHeight.value - modelMenuHeight - padding;
-  }
-  
-  y = Math.max(padding, y);
-  
-  modelMenuX.value = x;
-  modelMenuY.value = y;
-  showModelMenu.value = true;
 };
 
 const switchModel = async (model: ModelInfo) => {
-  showModelMenu.value = false;
-  
   if (!chloe) return;
   
   currentModel.value = model;
@@ -503,105 +341,6 @@ const switchModel = async (model: ModelInfo) => {
   setTimeout(() => {
     isLoading.value = false;
   }, 500);
-};
-
-const handleSaveSettings = async (settings: { 
-  path: string; 
-  scale: number; 
-  offsetX: number; 
-  offsetY: number;
-  bubbleColor: string;
-  eyeTracking: boolean;
-  systemPrompt: string;
-  girlfriendName: string;
-  windowWidth: number;
-  windowHeight: number;
-}) => {
-  let normalizedPath = settings.path;
-  if (!normalizedPath.endsWith('/') && !normalizedPath.endsWith('\\')) {
-    normalizedPath += '/';
-  }
-  
-  modelBasePath.value = normalizedPath;
-  modelScale.value = settings.scale;
-  modelOffsetX.value = settings.offsetX;
-  modelOffsetY.value = settings.offsetY;
-  bubbleColor.value = settings.bubbleColor;
-  systemPrompt.value = settings.systemPrompt;
-  girlfriendName.value = settings.girlfriendName;
-  
-  if (settings.windowWidth !== windowWidth.value || settings.windowHeight !== windowHeight.value) {
-    windowWidth.value = settings.windowWidth;
-    windowHeight.value = settings.windowHeight;
-    
-    // 通知 App.vue 窗口尺寸变化
-    emit('window-size-change', windowWidth.value, windowHeight.value);
-    localStorage.setItem('chloeWindowSize', JSON.stringify({ 
-      width: windowWidth.value, 
-      height: windowHeight.value 
-    }));
-    
-    if (window.electronAPI?.setWindowSize) {
-      window.electronAPI.setWindowSize(settings.windowWidth, settings.windowHeight);
-    }
-    setTimeout(() => {
-      resizeCanvas();
-    }, 100);
-  }
-  
-  if (settings.eyeTracking !== eyeTrackingEnabled.value) {
-    eyeTrackingEnabled.value = settings.eyeTracking;
-    if (settings.eyeTracking) {
-      window.electronAPI.startGlobalMouseTracking();
-      window.electronAPI.onGlobalMouseMove((data: { x: number; y: number }) => {
-        handleGlobalMouseMove(data);
-      });
-    } else {
-      window.electronAPI.stopGlobalMouseTracking();
-    }
-  }
-  
-  if (window.electronAPI) {
-    window.electronAPI.setConfig({ 
-      modelPath: normalizedPath,
-      modelScale: settings.scale,
-      modelOffsetX: settings.offsetX,
-      modelOffsetY: settings.offsetY,
-      bubbleColor: settings.bubbleColor,
-      eyeTracking: settings.eyeTracking,
-      systemPrompt: settings.systemPrompt,
-      girlfriendName: settings.girlfriendName,
-      windowWidth: settings.windowWidth,
-      windowHeight: settings.windowHeight
-    }).then(() => {
-      saveToastText.value = '保存成功';
-      showSaveToast.value = true;
-      setTimeout(() => {
-        showSaveToast.value = false;
-      }, 2000);
-    });
-  }
-  
-  if (chloe) {
-    chloe.setModelTransform(settings.scale, settings.offsetX, settings.offsetY);
-  }
-};
-
-const handleUpdateTransform = (settings: { 
-  scale: number; 
-  offsetX: number; 
-  offsetY: number;
-}) => {
-  if (chloe) {
-    chloe.setModelTransform(settings.scale, settings.offsetX, settings.offsetY);
-  }
-};
-
-const handleCancelSettings = () => {
-  showSettings.value = false;
-  if (chloe) {
-    chloe.setModelTransform(modelScale.value, modelOffsetX.value, modelOffsetY.value);
-  }
 };
 
 const handleMemoryCleared = () => {
@@ -680,48 +419,6 @@ const loadConfig = async () => {
         handleGlobalMouseMove(data);
       });
     }
-  }
-};
-
-const toggleEyeTracking = async () => {
-  showMenu.value = false;
-  eyeTrackingEnabled.value = !eyeTrackingEnabled.value;
-  
-  if (eyeTrackingEnabled.value) {
-    if (window.electronAPI) {
-      window.electronAPI.startGlobalMouseTracking();
-      window.electronAPI.onGlobalMouseMove((data) => {
-        handleGlobalMouseMove(data);
-      });
-    }
-  } else {
-    if (window.electronAPI) {
-      window.electronAPI.stopGlobalMouseTracking();
-    }
-  }
-  
-  if (window.electronAPI) {
-    window.electronAPI.setConfig({ eyeTracking: eyeTrackingEnabled.value }).then(() => {
-      saveToastText.value = eyeTrackingEnabled.value ? '已开启注视鼠标' : '已关闭注视鼠标';
-      showSaveToast.value = true;
-      setTimeout(() => {
-        showSaveToast.value = false;
-      }, 2000);
-    });
-  }
-};
-
-const toggleIgnoreMouseEvents = async () => {
-  showMenu.value = false;
-  ignoreMouseEvents.value = !ignoreMouseEvents.value;
-  
-  if (window.electronAPI) {
-    window.electronAPI.setIgnoreMouseEvents(ignoreMouseEvents.value);
-    saveToastText.value = ignoreMouseEvents.value ? '已开启鼠标穿透' : '已关闭鼠标穿透';
-    showSaveToast.value = true;
-    setTimeout(() => {
-      showSaveToast.value = false;
-    }, 2000);
   }
 };
 
@@ -806,6 +503,39 @@ onMounted(async () => {
         window.electronAPI.onIgnoreMouseEventsChanged((ignore: boolean) => {
           ignoreMouseEvents.value = ignore;
           console.log('[Live2DView] 鼠标穿透状态已同步:', ignore);
+        });
+        
+        window.electronAPI.onEyeTrackingChanged((enabled: boolean) => {
+          eyeTrackingEnabled.value = enabled;
+          if (enabled) {
+            window.electronAPI.startGlobalMouseTracking();
+            window.electronAPI.onGlobalMouseMove((data) => {
+              handleGlobalMouseMove(data);
+            });
+          } else {
+            window.electronAPI.stopGlobalMouseTracking();
+          }
+          saveToastText.value = enabled ? '已开启注视鼠标' : '已关闭注视鼠标';
+          showSaveToast.value = true;
+          setTimeout(() => { showSaveToast.value = false; }, 2000);
+        });
+        
+        window.electronAPI.onOpenMemoryPanel(() => {
+          showMemoryPanel.value = true;
+        });
+        
+        window.electronAPI.onModelChanged((model: ModelInfo) => {
+          switchModel(model);
+        });
+        
+        window.electronAPI.onSettingsSaved((settings: any) => {
+          loadConfig();
+          if (chloe) {
+            chloe.setModelTransform(modelScale.value, modelOffsetX.value, modelOffsetY.value);
+          }
+          saveToastText.value = '保存成功';
+          showSaveToast.value = true;
+          setTimeout(() => { showSaveToast.value = false; }, 2000);
         });
       }
     }

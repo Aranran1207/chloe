@@ -1,5 +1,6 @@
 <template>
-  <div id="app-container" :style="{ width: containerWidth + 'px', height: containerHeight + 'px' }">
+  <SettingsWindow v-if="isSettingsWindow" />
+  <div v-else id="app-container" :style="{ width: containerWidth + 'px', height: containerHeight + 'px' }">
     <Live2DView 
       @window-size-change="handleWindowSizeChange"
     />
@@ -9,6 +10,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import Live2DView from './components/Live2DView.vue';
+import SettingsWindow from './components/SettingsWindow.vue';
+
+const isSettingsWindow = window.location.hash === '#/settings';
 
 const containerWidth = ref(500);
 const containerHeight = ref(800);

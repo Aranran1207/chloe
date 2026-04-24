@@ -23,6 +23,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setIgnoreMouseEvents: (ignore) => ipcRenderer.send('set-ignore-mouse-events', ignore),
   onIgnoreMouseEventsChanged: (callback) => ipcRenderer.on('ignore-mouse-events-changed', (event, ignore) => callback(ignore)),
   
+  // 右键菜单和设置窗口
+  showContextMenu: (x, y) => ipcRenderer.send('show-context-menu', { x, y }),
+  closeSettingsWindow: () => ipcRenderer.send('close-settings-window'),
+  onEyeTrackingChanged: (callback) => ipcRenderer.on('eye-tracking-changed', (event, enabled) => callback(enabled)),
+  onOpenMemoryPanel: (callback) => ipcRenderer.on('open-memory-panel', () => callback()),
+  onModelChanged: (callback) => ipcRenderer.on('model-changed', (event, model) => callback(model)),
+  onSettingsSaved: (callback) => ipcRenderer.on('settings-saved', (event, settings) => callback(settings)),
+  
   // 记忆系统 API
   memory: {
     add: (memoryData) => ipcRenderer.invoke('memory-add', memoryData),
