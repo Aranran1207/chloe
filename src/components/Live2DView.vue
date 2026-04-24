@@ -37,6 +37,15 @@
           <div v-if="eyeTrackingEnabled" class="status-dot"></div>
         </div>
         
+        <div class="menu-item" @click="toggleIgnoreMouseEvents">
+          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 16V12M12 8H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span>{{ ignoreMouseEvents ? '关闭穿透' : '鼠标穿透' }}</span>
+          <div v-if="ignoreMouseEvents" class="status-dot"></div>
+        </div>
+        
         <div class="menu-item" @click="showModelSwitcher">
           <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M16 3H21V8M21 3L14 10M8 21H3V16M3 21L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -200,6 +209,7 @@ const thinkingPosition = ref({ x: 250, y: 350 });
 const showMemoryPanel = ref(false);
 const windowWidth = ref(500);
 const windowHeight = ref(800);
+const ignoreMouseEvents = ref(false);
 
 let motionManager: MotionManager | null = null;
 
@@ -639,6 +649,9 @@ const loadConfig = async () => {
     if (config.windowHeight !== undefined) {
       windowHeight.value = config.windowHeight;
     }
+    if (config.ignoreMouseEvents !== undefined) {
+      ignoreMouseEvents.value = config.ignoreMouseEvents;
+    }
     
     // 通知 App.vue 窗口尺寸
     emit('window-size-change', windowWidth.value, windowHeight.value);
@@ -695,6 +708,20 @@ const toggleEyeTracking = async () => {
         showSaveToast.value = false;
       }, 2000);
     });
+  }
+};
+
+const toggleIgnoreMouseEvents = async () => {
+  showMenu.value = false;
+  ignoreMouseEvents.value = !ignoreMouseEvents.value;
+  
+  if (window.electronAPI) {
+    window.electronAPI.setIgnoreMouseEvents(ignoreMouseEvents.value);
+    saveToastText.value = ignoreMouseEvents.value ? '已开启鼠标穿透' : '已关闭鼠标穿透';
+    showSaveToast.value = true;
+    setTimeout(() => {
+      showSaveToast.value = false;
+    }, 2000);
   }
 };
 
@@ -773,6 +800,14 @@ onMounted(async () => {
       (window as any).memoryExtractor = memoryExtractor;
       (window as any).memoryClient = memoryClient;
       console.log('[Live2DView] 调试工具已挂载到 window: proactiveEngine, memoryExtractor, memoryClient');
+      
+      // 监听鼠标穿透状态变化（从托盘菜单触发）
+      if (window.electronAPI) {
+        window.electronAPI.onIgnoreMouseEventsChanged((ignore: boolean) => {
+          ignoreMouseEvents.value = ignore;
+          console.log('[Live2DView] 鼠标穿透状态已同步:', ignore);
+        });
+      }
     }
 
     canvasRef.value.addEventListener('click', (e) => {

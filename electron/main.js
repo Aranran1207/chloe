@@ -21,6 +21,7 @@ let config = {
   girlfriendName: '',
   windowWidth: 500,
   windowHeight: 800,
+  ignoreMouseEvents: false,
   aiProvider: {
     type: 'ollama',
     apiUrl: 'http://localhost:11434',
@@ -165,6 +166,11 @@ function createWindow() {
     }
     return false;
   });
+  
+  // 设置初始鼠标穿透状态
+  if (config.ignoreMouseEvents) {
+    mainWindow.setIgnoreMouseEvents(true, { forward: true });
+  }
 }
 
 let dragOffsetX = 0;
@@ -223,6 +229,107 @@ ipcMain.on('set-window-size', (event, { width, height }) => {
   config.windowHeight = clampedHeight;
   saveConfig();
 });
+
+// 鼠标穿透功能
+ipcMain.handle('get-ignore-mouse-events', () => {
+  return config.ignoreMouseEvents || false;
+});
+
+ipcMain.on('set-ignore-mouse-events', (event, ignore) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
+    config.ignoreMouseEvents = ignore;
+    saveConfig();
+    console.log('[MouseEvents] 鼠标穿透已' + (ignore ? '开启' : '关闭'));
+    
+    // 通知渲染进程状态变化
+    mainWindow.webContents.send('ignore-mouse-events-changed', ignore);
+    
+    // 更新托盘菜单
+    if (tray) {
+      updateTrayMenu();
+    }
+  }
+});
+
+// 更新托盘菜单的函数
+function updateTrayMenu() {
+  if (!tray || !mainWindow) return;
+  
+  const isVisible = mainWindow.isVisible();
+  const isAlwaysOnTop = mainWindow.isAlwaysOnTop();
+  const isIgnoreMouseEvents = config.ignoreMouseEvents || false;
+  
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: isVisible ? '● 已显示' : '○ 已隐藏',
+      enabled: false
+    },
+    {
+      type: 'separator'
+    },
+    {
+      label: isVisible ? '隐藏窗口' : '显示窗口',
+      click: () => {
+        if (mainWindow) {
+          if (isVisible) {
+            mainWindow.hide();
+          } else {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+          updateTrayMenu();
+        }
+      }
+    },
+    {
+      type: 'separator'
+    },
+    {
+      label: '置顶显示',
+      type: 'checkbox',
+      checked: isAlwaysOnTop,
+      click: (menuItem) => {
+        if (mainWindow) {
+          mainWindow.setAlwaysOnTop(menuItem.checked);
+          updateTrayMenu();
+        }
+      }
+    },
+    {
+      label: '鼠标穿透',
+      type: 'checkbox',
+      checked: isIgnoreMouseEvents,
+      click: (menuItem) => {
+        if (mainWindow) {
+          mainWindow.setIgnoreMouseEvents(menuItem.checked, { forward: true });
+          config.ignoreMouseEvents = menuItem.checked;
+          saveConfig();
+          console.log('[MouseEvents] 鼠标穿透已' + (menuItem.checked ? '开启' : '关闭'));
+          
+          // 通知渲染进程状态变化
+          mainWindow.webContents.send('ignore-mouse-events-changed', menuItem.checked);
+          
+          updateTrayMenu();
+        }
+      }
+    },
+    {
+      type: 'separator'
+    },
+    {
+      label: '退出',
+      click: () => {
+        if (memoryDb) {
+          memoryDb.close();
+        }
+        app.quit();
+      }
+    }
+  ]);
+  
+  tray.setContextMenu(contextMenu);
+}
 
 let globalMouseTracking = false;
 
@@ -672,68 +779,11 @@ function createTray() {
   
   tray = new Tray(icon.resize({ width: 16, height: 16 }));
   
-  const updateContextMenu = () => {
-    const isVisible = mainWindow ? mainWindow.isVisible() : false;
-    const isAlwaysOnTop = mainWindow ? mainWindow.isAlwaysOnTop() : true;
-    
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: isVisible ? '● 已显示' : '○ 已隐藏',
-        enabled: false
-      },
-      {
-        type: 'separator'
-      },
-      {
-        label: isVisible ? '隐藏窗口' : '显示窗口',
-        click: () => {
-          if (mainWindow) {
-            if (isVisible) {
-              mainWindow.hide();
-            } else {
-              mainWindow.show();
-              mainWindow.focus();
-            }
-            updateContextMenu();
-          }
-        }
-      },
-      {
-        type: 'separator'
-      },
-      {
-        label: '置顶显示',
-        type: 'checkbox',
-        checked: isAlwaysOnTop,
-        click: (menuItem) => {
-          if (mainWindow) {
-            mainWindow.setAlwaysOnTop(menuItem.checked);
-            updateContextMenu();
-          }
-        }
-      },
-      {
-        type: 'separator'
-      },
-      {
-        label: '退出',
-        click: () => {
-          if (memoryDb) {
-            memoryDb.close();
-          }
-          app.quit();
-        }
-      }
-    ]);
-    
-    tray.setContextMenu(contextMenu);
-  };
-  
   tray.setToolTip('Chloe - AI女友桌面宠物');
-  updateContextMenu();
+  updateTrayMenu();
   
-  mainWindow.on('show', updateContextMenu);
-  mainWindow.on('hide', updateContextMenu);
+  mainWindow.on('show', updateTrayMenu);
+  mainWindow.on('hide', updateTrayMenu);
   
   tray.on('double-click', () => {
     if (mainWindow) {

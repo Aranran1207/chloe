@@ -18,6 +18,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),
   getModelList: () => ipcRenderer.invoke('get-model-list'),
   
+  // 鼠标穿透功能
+  getIgnoreMouseEvents: () => ipcRenderer.invoke('get-ignore-mouse-events'),
+  setIgnoreMouseEvents: (ignore) => ipcRenderer.send('set-ignore-mouse-events', ignore),
+  onIgnoreMouseEventsChanged: (callback) => ipcRenderer.on('ignore-mouse-events-changed', (event, ignore) => callback(ignore)),
+  
   // 记忆系统 API
   memory: {
     add: (memoryData) => ipcRenderer.invoke('memory-add', memoryData),
