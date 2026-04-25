@@ -18,8 +18,9 @@
 ### 🎭 Live2D 核心功能
 
 - **模型渲染** - 支持 Live2D Cubism 3.0+ 格式模型
-- **模型切换** - 动态切换不同的 Live2D 模型
+- **模型切换** - 动态切换不同的 Live2D 模型（右键菜单子菜单）
 - **注视鼠标** - 模型眼睛跟随鼠标移动
+- **鼠标穿透** - 开启后鼠标可穿透窗口点击底层应用
 - **点击交互** - 点击头部触发表情，点击身体触发动作
 - **动作触发** - AI 回复中可自动触发 Live2D 动作
 
@@ -28,7 +29,8 @@
 - **多模型支持** - 本地 Ollama 与云端 OpenAI API 无缝切换
 - **流式输出** - AI 回复实时显示，无需等待
 - **记忆系统** - 自动记录用户喜好，智能检索相关记忆
-- **主动提问** - 发现信息缺口时主动询问用户
+- **主动提问** - 发现信息缺口时主动询问用户，问题风格自然可爱
+- **间接表达理解** - AI 可从"我天天听XX"等间接表达中提取记忆
 - **自定义角色** - 可自定义名字、性格、说话风格
 
 ### 🎨 气泡对话系统
@@ -40,10 +42,13 @@
 
 ### ⚙️ 设置与系统
 
+- **独立设置窗口** - 设置面板在屏幕中央独立弹出，不受主窗口限制
+- **原生右键菜单** - 使用系统原生菜单，不受窗口大小限制
 - **窗口调整** - 支持 300×500 ~ 800×1200 尺寸范围
 - **系统托盘** - 最小化到托盘，支持托盘菜单控制
 - **配置持久化** - 自动保存用户设置
 - **记忆管理** - 查看、编辑、删除记忆
+- **快速启动** - 提供一键切换 Node 版本并启动的 bat 脚本
 
 ---
 
@@ -57,7 +62,7 @@
 
 ### 环境要求
 
-- Node.js 18+
+- Node.js 18+（推荐 22+，使用 nvm 管理版本）
 - npm 或 yarn
 - （可选）Ollama 本地运行环境
 
@@ -69,12 +74,22 @@ git clone https://github.com/your-username/chloe.git
 cd chloe
 
 # 2. 安装依赖
+cd chloe
 npm install
 
 # 3. 添加 Live2D 模型到 public/resources/ 目录
 
 # 4. 开发模式运行
 npm run electron:dev
+```
+
+### 快速启动（Windows）
+
+项目根目录提供了 `start.bat`，自动切换 Node 版本并启动：
+
+```bash
+# 双击运行或在终端执行
+start.bat
 ```
 
 ### 配置 Ollama（可选）
@@ -85,6 +100,7 @@ npm run electron:dev
 
 # 拉取推荐模型
 ollama pull qwen3.5:9b
+ollama pull nomic-embed-text-v2-moe:latest
 
 # 启动服务（通常自动启动）
 ollama serve
@@ -111,33 +127,40 @@ public/resources/
 ```
 chloe/
 ├── electron/                  # Electron 主进程
-│   ├── main.js               # 主进程入口
-│   └── preload.js            # 预加载脚本
+│   ├── main.js               # 主进程入口（窗口管理、IPC、托盘、原生菜单）
+│   └── preload.js            # 预加载脚本（IPC 桥接）
 ├── public/                    # 公共资源
-│   ├── core/                 # Live2D Core
+│   ├── core/                 # Live2D Core SDK
 │   └── resources/            # Live2D 模型
 ├── src/
 │   ├── components/           # Vue 组件
-│   │   ├── Live2DView.vue    # 主视图
-│   │   ├── SettingsPanel.vue # 设置面板
+│   │   ├── Live2DView.vue    # 主视图（Live2D渲染、对话、交互）
+│   │   ├── SettingsWindow.vue # 独立设置窗口
+│   │   ├── SettingsPanel.vue  # 旧设置面板（已弃用）
 │   │   ├── ChatBubble.vue    # 对话气泡
 │   │   ├── ChatInput.vue     # 输入框
 │   │   ├── MemoryPanel.vue   # 记忆管理
-│   │   └── ...
+│   │   ├── ThinkingBubble.vue # 思考动画
+│   │   └── LoadingSpinner.vue # 加载动画
 │   ├── lib/                  # 核心库
 │   │   ├── ai/               # AI Provider 架构
 │   │   │   ├── types.ts      # 接口定义
 │   │   │   ├── OllamaProvider.ts
 │   │   │   └── OpenAIProvider.ts
 │   │   ├── memory/           # 记忆系统
-│   │   │   ├── memoryService.ts
-│   │   │   ├── memoryExtractor.ts
-│   │   │   └── embeddingService.ts
+│   │   │   ├── memoryTypes.ts    # 类型定义
+│   │   │   ├── memoryClient.ts   # 记忆客户端（IPC通信）
+│   │   │   ├── memoryExtractor.ts # 智能记忆提取（间接表达理解）
+│   │   │   ├── memoryIntegrator.ts # 记忆去重与合并
+│   │   │   ├── embeddingService.ts # 向量嵌入服务
+│   │   │   └── proactiveEngine.ts  # 主动提问引擎
 │   │   ├── chatService.ts    # 对话服务
-│   │   └── chloe.ts          # Live2D 控制器
+│   │   ├── chloe.ts          # Live2D 控制器
+│   │   └── motionManager.ts  # 动作管理器
 │   ├── framework/            # Live2D SDK
 │   ├── App.vue
 │   └── main.ts
+├── start.bat                 # Windows 快速启动脚本
 ├── package.json
 └── vite.config.ts
 ```
@@ -153,7 +176,7 @@ chloe/
 | TypeScript | 类型安全 |
 | Vite | 构建工具 |
 | Live2D Cubism SDK | Live2D 渲染引擎 |
-| better-sqlite3 | SQLite 数据库 |
+| better-sqlite3 | SQLite 数据库（记忆存储） |
 | Ollama | 本地大模型推理 |
 
 ---
@@ -200,7 +223,7 @@ chloe/
 MemoryExtractor        MemoryIntegrator
     │                        ▲
     ▼                        │
-MemoryService (SQLite + 向量索引)
+MemoryClient (SQLite + 向量索引)
     │
     ▼
 EmbeddingService (nomic-embed-text / text-embedding)
@@ -208,9 +231,29 @@ EmbeddingService (nomic-embed-text / text-embedding)
 
 **核心功能：**
 - **被动记忆** - 对话中自动记录用户喜好、个人信息
+- **间接表达理解** - 可从"我天天听XX"、"周末就打游戏呗"等间接表达中提取记忆
 - **智能检索** - 根据对话上下文检索相关记忆
-- **主动提问** - 发现信息缺口时主动询问用户
+- **主动提问** - 发现信息缺口时主动询问用户，问题风格自然可爱
 - **记忆去重** - 向量相似度 + 文本相似度双重检测
+- **记忆管理** - 可视化管理面板，支持编辑、删除、清空
+
+### 主动提问流程
+
+```
+ProactiveEngine 定时检查
+        │
+        ▼
+  分析记忆缺口（缺少哪些类别的记忆）
+        │
+        ▼
+  生成问题 → 改写为自然可爱的语气
+        │
+        ▼
+  气泡显示问题 → 用户回答
+        │
+        ▼
+  MemoryExtractor 提取记忆 → 保存到数据库
+```
 
 ---
 
@@ -225,13 +268,14 @@ EmbeddingService (nomic-embed-text / text-embedding)
 | Phase 3 | 主动提问引擎 | ✅ |
 | Phase 4 | 记忆管理界面 | ✅ |
 | Phase 5 | 云端模型支持 | ✅ |
+| Phase 6 | 桌面交互增强 | ✅ |
 
 ### 🚧 规划中
 
 | 阶段 | 功能 | 状态 |
 |------|------|------|
-| Phase 6 | 日常功能（闹钟/天气/日程） | 🟡 |
-| Phase 7 | 语音交互（TTS/ASR） | 🟡 |
+| Phase 7 | 日常功能（闹钟/天气/日程） | 🟡 |
+| Phase 8 | 语音交互（TTS/ASR） | 🟡 |
 
 ---
 
@@ -242,16 +286,21 @@ EmbeddingService (nomic-embed-text / text-embedding)
 ```json
 {
   "modelPath": "./resources/",
+  "currentModel": null,
   "modelScale": 1.0,
   "modelOffsetX": 0.0,
   "modelOffsetY": -0.3,
   "bubbleColor": "#8b5cf6",
   "eyeTracking": true,
+  "ignoreMouseEvents": false,
+  "systemPrompt": "",
+  "girlfriendName": "",
   "windowWidth": 500,
   "windowHeight": 800,
   "aiProvider": {
     "type": "ollama",
     "apiUrl": "http://localhost:11434",
+    "apiKey": "",
     "chatModel": "qwen3.5:9b",
     "embeddingModel": "nomic-embed-text-v2-moe:latest"
   }
@@ -279,6 +328,18 @@ npm run electron:build
 ---
 
 ## 📜 更新日志
+
+### 2026-04-22 - Phase 6 桌面交互增强
+
+- ✅ 鼠标穿透功能 - 右键菜单、托盘菜单均可开启/关闭
+- ✅ 原生右键菜单 - 使用 Electron 原生弹出菜单，不受窗口限制
+- ✅ 独立设置窗口 - 设置面板在屏幕中央独立弹出
+- ✅ 记忆提取增强 - 支持间接表达理解（如"我天天听XX"→喜好记忆）
+- ✅ 主动提问优化 - 问题风格更自然可爱，开放式提问
+- ✅ shouldExtract 优化 - 正则匹配扩展，支持更多口语表达
+- ✅ 快速启动脚本 - start.bat 自动切换 Node 版本
+- ✅ 状态同步 - 右键菜单、托盘菜单、设置窗口状态实时同步
+- ✅ 调试工具挂载 - proactiveEngine、memoryExtractor、memoryClient 挂载到 window
 
 ### 2026-04-22 - Phase 5 云端模型支持
 
@@ -315,10 +376,12 @@ npm run electron:build
 
 ## ⚠️ 注意事项
 
-1. **Live2D SDK 许可** - 请遵守 Live2D Cubism SDK 的许可协议
-2. **模型格式** - 仅支持 Live2D Cubism 3.0+ 格式（.moc3）
-3. **资源路径** - 模型资源需放在 `public/resources/` 目录
-4. **显存要求** - 9b 模型约需 6-7 GB 显存，可选择更小模型
+1. **Node.js 版本** - 需要 Node.js 18+，推荐使用 nvm 管理版本
+2. **Live2D SDK 许可** - 请遵守 Live2D Cubism SDK 的许可协议
+3. **模型格式** - 仅支持 Live2D Cubism 3.0+ 格式（.moc3）
+4. **资源路径** - 模型资源需放在 `public/resources/` 目录
+5. **模型文件** - 请勿修改 `*.model3.json`、`*.motion3.json` 等模型资源文件
+6. **显存要求** - 9b 模型约需 6-7 GB 显存，可选择更小模型
 
 ---
 
