@@ -5,6 +5,7 @@ import {
   ChatResponse,
   EmbeddingResponse,
   StreamCallbacks,
+  ToolCall,
   mergeConfig
 } from './types';
 
@@ -18,6 +19,92 @@ export class OllamaProvider implements AIProvider {
     this.config = mergeConfig(config);
   }
 
+  private convertMessagesForOllama(messages: ChatMessage[]): any[] {
+    return messages.map(msg => {
+      if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+        return {
+          role: 'assistant',
+          content: msg.content || '',
+          tool_calls: msg.tool_calls.map(tc => ({
+            function: {
+              name: tc.function.name,
+              arguments: this.parseArgumentsToObject(tc.function.arguments)
+            }
+          }))
+        };
+      }
+      
+      if (msg.role === 'tool') {
+        let functionName = msg.name || '';
+        if (!functionName && msg.tool_call_id) {
+          for (const m of messages) {
+            if (m.role === 'assistant' && m.tool_calls) {
+              const matched = m.tool_calls.find(tc => tc.id === msg.tool_call_id);
+              if (matched) {
+                functionName = matched.function.name;
+                break;
+              }
+            }
+          }
+        }
+        return {
+          role: 'tool',
+          name: functionName,
+          content: msg.content
+        };
+      }
+      
+      return {
+        role: msg.role,
+        content: msg.content
+      };
+    });
+  }
+
+  private parseArgumentsToObject(args: string): any {
+    if (!args) return {};
+    try {
+      return JSON.parse(args);
+    } catch {
+      return {};
+    }
+  }
+
+  private buildBody(messages: ChatMessage[], config: AIProviderConfig, stream: boolean) {
+    const convertedMessages = this.convertMessagesForOllama(messages);
+    
+    const body: Record<string, any> = {
+      model: config.chatModel,
+      messages: convertedMessages,
+      stream,
+      options: {
+        num_ctx: config.maxTokens || 4096,
+        temperature: config.temperature || 0.8,
+        think: false
+      }
+    };
+
+    if (config.tools && config.tools.length > 0) {
+      body.tools = config.tools;
+    }
+
+    return body;
+  }
+
+  private parseToolCallsFromMessage(message: any): ToolCall[] | undefined {
+    if (!message.tool_calls || message.tool_calls.length === 0) return undefined;
+    return message.tool_calls.map((tc: any) => ({
+      id: tc.id || `call_${Math.random().toString(36).substring(2, 10)}`,
+      type: 'function' as const,
+      function: {
+        name: tc.function.name,
+        arguments: typeof tc.function.arguments === 'string'
+          ? tc.function.arguments
+          : JSON.stringify(tc.function.arguments)
+      }
+    }));
+  }
+
   async chat(
     messages: ChatMessage[],
     config?: Partial<AIProviderConfig>
@@ -27,16 +114,7 @@ export class OllamaProvider implements AIProvider {
     const response = await fetch(`${effectiveConfig.apiUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: effectiveConfig.chatModel,
-        messages,
-        stream: false,
-        options: {
-          num_ctx: effectiveConfig.maxTokens || 4096,
-          temperature: effectiveConfig.temperature || 0.8,
-          think: false
-        }
-      })
+      body: JSON.stringify(this.buildBody(messages, effectiveConfig, false))
     });
 
     if (!response.ok) {
@@ -44,9 +122,12 @@ export class OllamaProvider implements AIProvider {
     }
 
     const data = await response.json();
+    const tool_calls = this.parseToolCallsFromMessage(data.message);
     
     return {
       content: data.message?.content || '',
+      tool_calls,
+      finish_reason: tool_calls ? 'tool_calls' : 'stop',
       usage: {
         promptTokens: data.prompt_eval_count,
         completionTokens: data.eval_count,
@@ -62,16 +143,7 @@ export class OllamaProvider implements AIProvider {
   ): Promise<string> {
     const effectiveConfig = { ...this.config, ...config };
     const url = `${effectiveConfig.apiUrl}/api/chat`;
-    const body = {
-      model: effectiveConfig.chatModel,
-      messages,
-      stream: true,
-      options: {
-        num_ctx: effectiveConfig.maxTokens || 4096,
-        temperature: effectiveConfig.temperature || 0.8,
-        think: false
-      }
-    };
+    const body = this.buildBody(messages, effectiveConfig, true);
     
     console.log('[Ollama] 请求 URL:', url);
     console.log('[Ollama] 请求 Body:', JSON.stringify(body, null, 2));
@@ -108,6 +180,7 @@ export class OllamaProvider implements AIProvider {
     const decoder = new TextDecoder();
     let fullContent = '';
     let chunkCount = 0;
+    const toolCallMap = new Map<number, ToolCall>();
 
     try {
       while (true) {
@@ -129,6 +202,23 @@ export class OllamaProvider implements AIProvider {
               fullContent += token;
               callbacks.onToken(token);
             }
+
+            if (data.message?.tool_calls) {
+              for (let i = 0; i < data.message.tool_calls.length; i++) {
+                const tc = data.message.tool_calls[i];
+                toolCallMap.set(i, {
+                  id: tc.id || `call_${Math.random().toString(36).substring(2, 10)}`,
+                  type: 'function',
+                  function: {
+                    name: tc.function.name,
+                    arguments: typeof tc.function.arguments === 'string'
+                      ? tc.function.arguments
+                      : JSON.stringify(tc.function.arguments)
+                  }
+                });
+              }
+            }
+
             if (data.done) {
               console.log('[Ollama] Ollama 报告完成');
             }
@@ -136,6 +226,11 @@ export class OllamaProvider implements AIProvider {
             // Skip invalid JSON
           }
         }
+      }
+
+      if (toolCallMap.size > 0) {
+        const toolCalls = Array.from(toolCallMap.values());
+        callbacks.onToolCall?.(toolCalls);
       }
     } catch (error) {
       console.error('[Ollama] 流读取错误:', error);

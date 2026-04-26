@@ -5,6 +5,7 @@ import {
   ChatResponse,
   EmbeddingResponse,
   StreamCallbacks,
+  ToolCall,
   mergeConfig
 } from './types';
 
@@ -30,6 +31,35 @@ export class OpenAIProvider implements AIProvider {
     return headers;
   }
 
+  private buildBody(messages: ChatMessage[], config: AIProviderConfig, stream: boolean) {
+    const body: Record<string, any> = {
+      model: config.chatModel,
+      messages,
+      temperature: config.temperature || 0.8,
+      max_tokens: config.maxTokens,
+      stream
+    };
+
+    if (config.tools && config.tools.length > 0) {
+      body.tools = config.tools;
+      body.tool_choice = config.toolChoice || 'auto';
+    }
+
+    return body;
+  }
+
+  private parseToolCallsFromMessage(message: any): ToolCall[] | undefined {
+    if (!message.tool_calls || message.tool_calls.length === 0) return undefined;
+    return message.tool_calls.map((tc: any) => ({
+      id: tc.id,
+      type: 'function' as const,
+      function: {
+        name: tc.function.name,
+        arguments: tc.function.arguments
+      }
+    }));
+  }
+
   async chat(
     messages: ChatMessage[],
     config?: Partial<AIProviderConfig>
@@ -39,12 +69,7 @@ export class OpenAIProvider implements AIProvider {
     const response = await fetch(`${effectiveConfig.apiUrl}/chat/completions`, {
       method: 'POST',
       headers: this.getHeaders(effectiveConfig),
-      body: JSON.stringify({
-        model: effectiveConfig.chatModel,
-        messages,
-        temperature: effectiveConfig.temperature || 0.8,
-        max_tokens: effectiveConfig.maxTokens
-      })
+      body: JSON.stringify(this.buildBody(messages, effectiveConfig, false))
     });
 
     if (!response.ok) {
@@ -55,10 +80,14 @@ export class OpenAIProvider implements AIProvider {
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
+    const choice = data.choices?.[0];
+    const content = choice?.message?.content || '';
+    const tool_calls = this.parseToolCallsFromMessage(choice?.message);
     
     return {
       content,
+      tool_calls,
+      finish_reason: choice?.finish_reason,
       usage: {
         promptTokens: data.usage?.prompt_tokens,
         completionTokens: data.usage?.completion_tokens,
@@ -74,13 +103,7 @@ export class OpenAIProvider implements AIProvider {
   ): Promise<string> {
     const effectiveConfig = { ...this.config, ...config };
     const url = `${effectiveConfig.apiUrl}/chat/completions`;
-    const body = {
-      model: effectiveConfig.chatModel,
-      messages,
-      temperature: effectiveConfig.temperature || 0.8,
-      max_tokens: effectiveConfig.maxTokens,
-      stream: true
-    };
+    const body = this.buildBody(messages, effectiveConfig, true);
     
     console.log('[OpenAI] 请求 URL:', url);
     console.log('[OpenAI] 请求 Body:', JSON.stringify(body, null, 2));
@@ -108,6 +131,7 @@ export class OpenAIProvider implements AIProvider {
 
     const decoder = new TextDecoder();
     let fullContent = '';
+    const toolCallMap = new Map<number, ToolCall>();
 
     try {
       while (true) {
@@ -124,16 +148,43 @@ export class OpenAIProvider implements AIProvider {
             
             try {
               const data = JSON.parse(dataStr);
-              const token = data.choices?.[0]?.delta?.content;
-              if (token) {
-                fullContent += token;
-                callbacks.onToken(token);
+              const delta = data.choices?.[0]?.delta;
+              
+              if (delta?.content) {
+                fullContent += delta.content;
+                callbacks.onToken(delta.content);
+              }
+
+              if (delta?.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  const idx = tc.index;
+                  if (!toolCallMap.has(idx)) {
+                    toolCallMap.set(idx, {
+                      id: tc.id || '',
+                      type: 'function',
+                      function: {
+                        name: tc.function?.name || '',
+                        arguments: tc.function?.arguments || ''
+                      }
+                    });
+                  } else {
+                    const existing = toolCallMap.get(idx)!;
+                    if (tc.id) existing.id = tc.id;
+                    if (tc.function?.name) existing.function.name += tc.function.name;
+                    if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+                  }
+                }
               }
             } catch {
               // Skip invalid JSON
             }
           }
         }
+      }
+
+      if (toolCallMap.size > 0) {
+        const toolCalls = Array.from(toolCallMap.values());
+        callbacks.onToolCall?.(toolCalls);
       }
     } catch (error) {
       callbacks.onError?.(error as Error);

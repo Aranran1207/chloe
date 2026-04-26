@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, dialog, Tray, Menu, nativeImage, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
@@ -77,6 +77,20 @@ function initMemoryDatabase() {
         key TEXT PRIMARY KEY,
         value TEXT
       );
+      
+      CREATE TABLE IF NOT EXISTS reminders (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        trigger_at TEXT NOT NULL,
+        repeat_rule TEXT DEFAULT 'none',
+        status TEXT DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        last_fired_at TEXT,
+        next_trigger_at TEXT
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_reminder_status ON reminders(status);
+      CREATE INDEX IF NOT EXISTS idx_reminder_trigger ON reminders(trigger_at);
     `);
     
     console.log('[MemoryDB] 数据库初始化成功:', memoryDbPath);
@@ -550,6 +564,162 @@ ipcMain.handle('get-model-list', () => {
   return getModelList();
 });
 
+// ============ 提醒系统 IPC ============
+
+ipcMain.handle('reminder-add', (event, reminderData) => {
+  if (!memoryDb) return { success: false, error: '数据库未初始化' };
+  
+  try {
+    const id = generateUUID();
+    const now = new Date().toISOString();
+    
+    let triggerAt = reminderData.triggerAt;
+    try {
+      const triggerDate = new Date(reminderData.triggerAt);
+      if (!isNaN(triggerDate.getTime())) {
+        triggerAt = triggerDate.toISOString();
+      }
+    } catch {}
+    
+    console.log('[ReminderDB] 原始 triggerAt:', reminderData.triggerAt, '-> 标准化:', triggerAt);
+    
+    const stmt = memoryDb.prepare(`
+      INSERT INTO reminders (id, content, trigger_at, repeat_rule, status, created_at)
+      VALUES (?, ?, ?, ?, 'pending', ?)
+    `);
+    
+    stmt.run(
+      id,
+      reminderData.content,
+      triggerAt,
+      reminderData.repeatRule || 'none',
+      now
+    );
+    
+    console.log('[ReminderDB] 添加提醒:', id, reminderData.content, '触发时间:', triggerAt);
+    return { success: true, id };
+  } catch (error) {
+    console.error('[ReminderDB] 添加提醒失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('reminder-get-all', () => {
+  if (!memoryDb) return [];
+  
+  try {
+    const rows = memoryDb.prepare('SELECT * FROM reminders ORDER BY trigger_at ASC').all();
+    return rows.map(row => ({
+      id: row.id,
+      content: row.content,
+      triggerAt: row.trigger_at,
+      repeatRule: row.repeat_rule,
+      status: row.status,
+      createdAt: row.created_at,
+      lastFiredAt: row.last_fired_at,
+      nextTriggerAt: row.next_trigger_at
+    }));
+  } catch (error) {
+    console.error('[ReminderDB] 获取提醒失败:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('reminder-delete', (event, id) => {
+  if (!memoryDb) return { success: false, error: '数据库未初始化' };
+  
+  try {
+    const result = memoryDb.prepare('DELETE FROM reminders WHERE id = ?').run(id);
+    return { success: result.changes > 0 };
+  } catch (error) {
+    console.error('[ReminderDB] 删除提醒失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ============ 提醒调度器 ============
+
+let reminderCheckInterval = null;
+
+function startReminderScheduler() {
+  if (reminderCheckInterval) return;
+  
+  console.log('[ReminderScheduler] 启动提醒调度器');
+  
+  reminderCheckInterval = setInterval(() => {
+    checkAndFireReminders();
+  }, 15000);
+  
+  checkAndFireReminders();
+}
+
+function checkAndFireReminders() {
+  if (!memoryDb || !mainWindow || mainWindow.isDestroyed()) return;
+  
+  try {
+    const now = new Date();
+    const nowISO = now.toISOString();
+    
+    const pending = memoryDb.prepare(
+      "SELECT * FROM reminders WHERE status = 'pending' AND trigger_at <= ?"
+    ).all(nowISO);
+    
+    if (pending.length === 0) return;
+    
+    const updateStmt = memoryDb.prepare(
+      "UPDATE reminders SET status = 'fired', last_fired_at = ? WHERE id = ? AND status = 'pending'"
+    );
+    
+    const updateRepeatStmt = memoryDb.prepare(
+      "UPDATE reminders SET status = 'pending', next_trigger_at = ?, trigger_at = ? WHERE id = ?"
+    );
+    
+    const fireTransaction = memoryDb.transaction((reminders) => {
+      for (const reminder of reminders) {
+        const result = updateStmt.run(nowISO, reminder.id);
+        if (result.changes === 0) continue;
+        
+        console.log('[ReminderScheduler] 触发提醒:', reminder.content);
+        
+        if (reminder.repeat_rule === 'daily') {
+          const next = new Date(reminder.trigger_at);
+          next.setDate(next.getDate() + 1);
+          while (next <= now) {
+            next.setDate(next.getDate() + 1);
+          }
+          updateRepeatStmt.run(next.toISOString(), next.toISOString(), reminder.id);
+        } else if (reminder.repeat_rule === 'weekly') {
+          const next = new Date(reminder.trigger_at);
+          next.setDate(next.getDate() + 7);
+          while (next <= now) {
+            next.setDate(next.getDate() + 7);
+          }
+          updateRepeatStmt.run(next.toISOString(), next.toISOString(), reminder.id);
+        }
+        
+        mainWindow.webContents.send('reminder-fire', {
+          id: reminder.id,
+          content: reminder.content,
+          triggerAt: reminder.trigger_at
+        });
+        
+        if (Notification.isSupported()) {
+          const notification = new Notification({
+            title: 'Chloe 提醒你',
+            body: reminder.content,
+            silent: false
+          });
+          notification.show();
+        }
+      }
+    });
+    
+    fireTransaction(pending);
+  } catch (error) {
+    console.error('[ReminderScheduler] 检查提醒失败:', error);
+  }
+}
+
 // ============ 记忆系统 IPC ============
 
 function generateUUID() {
@@ -909,6 +1079,7 @@ app.whenReady().then(() => {
   initMemoryDatabase();
   createWindow();
   createTray();
+  startReminderScheduler();
 });
 
 function createTray() {

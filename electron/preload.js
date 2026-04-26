@@ -18,12 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),
   getModelList: () => ipcRenderer.invoke('get-model-list'),
   
-  // 鼠标穿透功能
   getIgnoreMouseEvents: () => ipcRenderer.invoke('get-ignore-mouse-events'),
   setIgnoreMouseEvents: (ignore) => ipcRenderer.send('set-ignore-mouse-events', ignore),
   onIgnoreMouseEventsChanged: (callback) => ipcRenderer.on('ignore-mouse-events-changed', (event, ignore) => callback(ignore)),
   
-  // 右键菜单和设置窗口
   showContextMenu: (x, y) => ipcRenderer.send('show-context-menu', { x, y }),
   closeSettingsWindow: () => ipcRenderer.send('close-settings-window'),
   onEyeTrackingChanged: (callback) => ipcRenderer.on('eye-tracking-changed', (event, enabled) => callback(enabled)),
@@ -31,7 +29,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onModelChanged: (callback) => ipcRenderer.on('model-changed', (event, model) => callback(model)),
   onSettingsSaved: (callback) => ipcRenderer.on('settings-saved', (event, settings) => callback(settings)),
   
-  // 记忆系统 API
   memory: {
     add: (memoryData) => ipcRenderer.invoke('memory-add', memoryData),
     getAll: () => ipcRenderer.invoke('memory-get-all'),
@@ -41,5 +38,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clearAll: () => ipcRenderer.invoke('memory-clear-all'),
     getStats: () => ipcRenderer.invoke('memory-get-stats'),
     searchByEmbedding: (embedding, topK) => ipcRenderer.invoke('memory-search-by-embedding', embedding, topK)
+  },
+
+  reminder: {
+    add: (reminderData) => ipcRenderer.invoke('reminder-add', reminderData),
+    getAll: () => ipcRenderer.invoke('reminder-get-all'),
+    delete: (id) => ipcRenderer.invoke('reminder-delete', id),
+    onFire: (callback) => ipcRenderer.on('reminder-fire', (event, data) => callback(event, data))
   }
 });

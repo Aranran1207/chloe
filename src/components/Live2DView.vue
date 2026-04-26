@@ -58,6 +58,7 @@ import { MotionManager } from '../lib/motionManager';
 import { proactiveEngine } from '../lib/memory/proactiveEngine';
 import { memoryExtractor } from '../lib/memory/memoryExtractor';
 import { memoryClient } from '../lib/memory/memoryClient';
+import { reminderClient } from '../lib/reminder/reminderClient';
 import MemoryPanel from './MemoryPanel.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import ChatBubble from './ChatBubble.vue';
@@ -143,7 +144,58 @@ const handleProactiveQuestion = async (question: string) => {
   isStreaming.value = false;
 };
 
-// 修复：Canvas 尺寸使用固定值，避免亚像素偏移导致容器不断扩张
+const firedReminderIds = new Set<string>();
+let pendingReminder: { id: string; content: string; triggerAt: string } | null = null;
+let reminderCheckTimer: ReturnType<typeof setTimeout> | null = null;
+
+const handleReminderFire = (data: { id: string; content: string; triggerAt: string }) => {
+  if (firedReminderIds.has(data.id)) return;
+  firedReminderIds.add(data.id);
+  
+  console.log('[Live2DView] 收到提醒触发:', data.content);
+  
+  if (isProcessing.value || showBubble.value) {
+    console.log('[Live2DView] 正在处理中，排队等待显示提醒');
+    pendingReminder = data;
+    if (!reminderCheckTimer) {
+      reminderCheckTimer = setInterval(() => {
+        if (!isProcessing.value && !showBubble.value && pendingReminder) {
+          showReminderBubble(pendingReminder);
+          pendingReminder = null;
+          if (reminderCheckTimer) {
+            clearInterval(reminderCheckTimer);
+            reminderCheckTimer = null;
+          }
+        }
+      }, 1000);
+    }
+    return;
+  }
+  
+  showReminderBubble(data);
+};
+
+const showReminderBubble = (data: { id: string; content: string; triggerAt: string }) => {
+  const reminderText = `亲爱的，提醒你：${data.content}~`;
+  
+  showThinking.value = true;
+  isStreaming.value = true;
+  bubbleText.value = reminderText;
+  
+  setTimeout(() => {
+    showThinking.value = false;
+    showBubble.value = true;
+  }, 500);
+  
+  isStreaming.value = false;
+  
+  if (motionManager) {
+    setTimeout(() => {
+      motionManager?.playMotionByName('提醒');
+    }, 300);
+  }
+};
+
 const resizeCanvas = () => {
   if (!canvasRef.value || !containerRef.value) return;
   
@@ -496,7 +548,8 @@ onMounted(async () => {
       (window as any).proactiveEngine = proactiveEngine;
       (window as any).memoryExtractor = memoryExtractor;
       (window as any).memoryClient = memoryClient;
-      console.log('[Live2DView] 调试工具已挂载到 window: proactiveEngine, memoryExtractor, memoryClient');
+      (window as any).reminderClient = reminderClient;
+      console.log('[Live2DView] 调试工具已挂载到 window: proactiveEngine, memoryExtractor, memoryClient, reminderClient');
       
       // 监听鼠标穿透状态变化（从托盘菜单触发）
       if (window.electronAPI) {
@@ -537,6 +590,13 @@ onMounted(async () => {
           showSaveToast.value = true;
           setTimeout(() => { showSaveToast.value = false; }, 2000);
         });
+        
+        if ((window as any).electronAPI?.reminder) {
+          (window as any).electronAPI.reminder.onFire((_: any, data: any) => {
+            handleReminderFire(data);
+          });
+          console.log('[Live2DView] 提醒触发监听已注册');
+        }
       }
     }
 
@@ -556,6 +616,11 @@ onMounted(async () => {
 
 onUnmounted(() => {
   proactiveEngine.stopProactiveMode();
+  
+  if (reminderCheckTimer) {
+    clearInterval(reminderCheckTimer);
+    reminderCheckTimer = null;
+  }
   
   if (window.electronAPI) {
     window.electronAPI.stopGlobalMouseTracking();

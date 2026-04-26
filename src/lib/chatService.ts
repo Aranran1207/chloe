@@ -1,8 +1,9 @@
-import { createProvider, AIProvider, AIProviderConfig, ChatMessage as AIChatMessage, ProviderType } from './ai';
+import { createProvider, AIProvider, AIProviderConfig, ChatMessage as AIChatMessage, ProviderType, ToolCall, ToolResult } from './ai';
 import { memoryClient } from './memory/memoryClient';
 import { memoryIntegrator } from './memory/memoryIntegrator';
 import { memoryExtractor } from './memory/memoryExtractor';
 import { embeddingService } from './memory/embeddingService';
+import { getAvailableTools, executeToolCalls } from './reminder/toolExecutor';
 import type { Memory } from './memory/memoryTypes';
 
 export interface ChatMessage {
@@ -59,7 +60,6 @@ export function setProviderConfig(config: AIProviderSettings): void {
       (config.type === 'openai' ? 'text-embedding-3-small' : 'nomic-embed-text-v2-moe:latest')
   });
   
-  // 同步配置到 memoryExtractor
   memoryExtractor.setConfig({
     type: config.type,
     apiUrl: config.apiUrl,
@@ -110,6 +110,13 @@ export function getCurrentConfig(): AIProviderSettings | null {
 const buildDefaultPrompt = (name: string, modelName?: string, availableMotions?: string, memories?: Memory[]): string => {
   const displayName = name || modelName || 'Chloe';
   let prompt = `你是${displayName}，我的女友。请用可爱的语气回复，称呼我为"亲爱的"。`;
+  
+  const now = new Date();
+  prompt += `\n\n【当前时间】现在是 ${now.toLocaleString('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    weekday: 'long'
+  })}（ISO: ${now.toISOString()}，时区: ${Intl.DateTimeFormat().resolvedOptions().timeZone}）。当用户提到时间相关的内容（如"X分钟后"、"明天下午3点"等），请根据当前时间直接计算目标时间。`;
   
   if (memories && memories.length > 0) {
     prompt = memoryIntegrator.buildMemoryPrompt(prompt, memories);
@@ -263,6 +270,8 @@ export async function sendMessage(
   }
 }
 
+const MAX_TOOL_ROUNDS = 5;
+
 export async function sendMessageStream(
   message: string,
   onToken: (token: string) => void,
@@ -290,13 +299,80 @@ export async function sendMessageStream(
   });
 
   try {
-    const messages: AIChatMessage[] = [
+    const tools = getAvailableTools();
+    let messages: AIChatMessage[] = [
       { role: 'system', content: prompt },
       { role: 'user', content: message }
     ];
-    
-    const fullContent = await provider.chatStream(messages, {
-      onToken,
+
+    let lastAssistantContent = '';
+
+    let toolRound = 0;
+    while (toolRound < MAX_TOOL_ROUNDS) {
+      console.log(`[ToolLoop] 第 ${toolRound + 1} 轮，消息数: ${messages.length}`);
+      
+      const response = await provider.chat(messages, { tools, toolChoice: 'auto' });
+      lastAssistantContent = response.content || '';
+      
+      if (response.tool_calls && response.tool_calls.length > 0) {
+        console.log(`[ToolLoop] AI 请求调用 ${response.tool_calls.length} 个工具:`, 
+          response.tool_calls.map(tc => tc.function.name));
+        
+        const assistantMsg: AIChatMessage = {
+          role: 'assistant',
+          content: response.content || '',
+          tool_calls: response.tool_calls
+        };
+        messages.push(assistantMsg);
+        
+        const toolResults = await executeToolCalls(response.tool_calls);
+        
+        for (let i = 0; i < toolResults.length; i++) {
+          const result = toolResults[i];
+          const toolName = response.tool_calls[i]?.function.name || '';
+          messages.push({
+            role: 'tool',
+            content: result.content,
+            tool_call_id: result.tool_call_id,
+            name: toolName
+          });
+        }
+        
+        toolRound++;
+      } else {
+        break;
+      }
+    }
+
+    // 如果工具循环最后一轮已经有文本内容，直接使用，不再额外流式调用
+    if (lastAssistantContent && toolRound > 0) {
+      console.log('[ToolLoop] 工具循环已产生文本回复，跳过额外流式调用');
+      const { cleanText, motions } = parseMotionTriggers(lastAssistantContent);
+      onToken(cleanText);
+      
+      const endTime = performance.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+      console.log('\n========================================');
+      console.log('[聊天记录 (工具模式)]');
+      console.log('========================================');
+      console.log(`[用户] ${message}`);
+      console.log('----------------------------------------');
+      console.log(`[AI] ${lastAssistantContent}`);
+      console.log('========================================');
+      console.log(`[统计] 耗时: ${duration}s | 工具轮数: ${toolRound}`);
+      console.log('========================================\n');
+      
+      extractAndSaveMemory(message, lastAssistantContent);
+      return lastAssistantContent || '抱歉，我没听懂呢~';
+    }
+
+    // 没有工具调用或工具循环无内容时，走正常流式调用
+    let fullContent = '';
+    await provider.chatStream(messages, {
+      onToken: (token) => {
+        fullContent += token;
+        onToken(token);
+      },
       onComplete: (content) => {
         const endTime = performance.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);

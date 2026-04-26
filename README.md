@@ -269,13 +269,27 @@ ProactiveEngine 定时检查
 | Phase 4 | 记忆管理界面 | ✅ |
 | Phase 5 | 云端模型支持 | ✅ |
 | Phase 6 | 桌面交互增强 | ✅ |
+| Phase 7.1 | Tool Calling 基础设施 | ✅ |
+| Phase 7.2 | 提醒功能 - 存储与调度 | ✅ |
+| Phase 7.3 | 提醒功能 - AI 工具集成 | ✅ |
+| Phase 7.4 | 提醒功能 - 通知触发 | ✅ |
 
-### 🚧 规划中
+### 🚧 开发中
 
 | 阶段 | 功能 | 状态 |
 |------|------|------|
-| Phase 7 | 日常功能（闹钟/天气/日程） | 🟡 |
-| Phase 8 | 语音交互（TTS/ASR） | 🟡 |
+| Phase 7.5 | 提醒功能 - 管理面板 + 重复提醒增强 | 🟡 |
+| Phase 8.A | 分层记忆 - 长期记忆版本链（解决信息更新冲突） | 🟡 |
+| Phase 8.B | 分层记忆 - 短期记忆层（对话记录保存） | 🟡 |
+| Phase 8.C | 分层记忆 - 中期记忆层（话题段自动压缩） | 🟡 |
+| Phase 8.D | 分层记忆 - 四层联合检索策略 | 🟡 |
+| Phase 8.E | 分层记忆 - 遗忘机制（自动过期+压缩） | 🟡 |
+
+### 🟡 规划中
+
+| 阶段 | 功能 | 状态 |
+|------|------|------|
+| Phase 9 | 语音交互（TTS/ASR） | 🟡 |
 
 ---
 
@@ -328,6 +342,17 @@ npm run electron:build
 ---
 
 ## 📜 更新日志
+
+### 2026-04-26 - Phase 7 提醒功能 & Tool Calling
+
+- ✅ Tool Calling 基础设施 - AI 类型系统扩展（ToolDefinition/ToolCall/ToolResult），OpenAI/Ollama Provider 支持 tools 参数和 tool_calls 响应解析
+- ✅ 工具执行循环 - chatService 实现 agentic loop，AI 返回 tool_calls → 执行工具 → 结果回传 → 最终回复
+- ✅ 提醒工具定义 - set_reminder / list_reminders / delete_reminder，系统提示词注入当前时间减少 API 轮次
+- ✅ 提醒存储调度 - SQLite reminders 表，15 秒轮询调度器，事务保护防重复触发
+- ✅ 三重通知 - 气泡提醒 + Windows 系统通知 + 提示音
+- ✅ 时区修复 - trigger_at 标准化为 UTC ISO 格式，解决调度器时区不匹配问题
+- ✅ Ollama 兼容 - convertMessagesForOllama 消息格式转换（tool_calls arguments 对象化、tool 角色 name 字段）
+- ✅ 提醒去重 - firedReminderIds 集合 + pendingReminder 队列，防止重复触发和回调级联
 
 ### 2026-04-22 - Phase 6 桌面交互增强
 

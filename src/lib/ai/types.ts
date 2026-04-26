@@ -1,7 +1,35 @@
 export type ProviderType = 'ollama' | 'openai';
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
+}
+
+export interface ToolCallFunction {
+  name: string;
+  arguments: string;
+}
+
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: ToolCallFunction;
+}
+
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, any>;
+  };
+}
+
+export interface ToolResult {
+  tool_call_id: string;
   content: string;
 }
 
@@ -13,16 +41,21 @@ export interface AIProviderConfig {
   embeddingModel?: string;
   maxTokens?: number;
   temperature?: number;
+  tools?: ToolDefinition[];
+  toolChoice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
 }
 
 export interface StreamCallbacks {
   onToken: (token: string) => void;
   onComplete?: (fullContent: string) => void;
   onError?: (error: Error) => void;
+  onToolCall?: (toolCalls: ToolCall[]) => void;
 }
 
 export interface ChatResponse {
   content: string;
+  tool_calls?: ToolCall[];
+  finish_reason?: 'stop' | 'tool_calls' | 'length';
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
